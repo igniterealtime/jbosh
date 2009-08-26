@@ -200,15 +200,76 @@ public class XEP0124Section17Test extends AbstractBOSHTest {
     /*
      * If it decides to recover from the error, then the client MUST repeat the
      * HTTP request that resulted in the error, as well as all the preceding
-     * HTTP requests that have not received responses.
+     * HTTP requests that have not received responses.  The content of these
+     * requests MUST be identical to the <body/> elements of the original
+     * requests.
      */
-    // TODO: Retry recoverable errors
+    @Test(timeout=5000)
+    public void retryRecoverableErrors() throws Exception {
+        logTestStart();
+        String testURI = "http://kenai.com/jbosh/junit";
+        BodyQName ref = BodyQName.createWithPrefix(testURI, "ref", "test");
 
-    /*
-     * The content of these requests MUST be identical to the <body/> elements
-     * of the original requests.
-     */
-    // TODO: Test that there are no changes made to the messages of retries
+        // Initiate a new session
+        session.send(ComposableBody.builder().build());
+        StubConnection conn = cm.awaitConnection();
+        AbstractBody scr = ComposableBody.builder()
+                .setAttribute(Attributes.SID, "123XYZ")
+                .setAttribute(Attributes.WAIT, "1")
+                .setAttribute(Attributes.REQUESTS, "3")
+                .build();
+        conn.sendResponse(scr);
+
+        // Send a couple requests
+        session.send(ComposableBody.builder()
+                .setNamespaceDefinition("test", testURI)
+                .setAttribute(ref, "S1")
+                .build());
+        StubConnection conn1 = cm.awaitConnection();
+        session.send(ComposableBody.builder()
+                .setNamespaceDefinition("test", testURI)
+                .setAttribute(ref, "S2")
+                .build());
+        StubConnection conn2 = cm.awaitConnection();
+
+        // Now respond to the first request with a recoverable error
+        String expected1 = conn1.getRequest().getBody().toXML();
+        conn1.sendResponse(ComposableBody.builder()
+                .setNamespaceDefinition("test", testURI)
+                .setAttribute(Attributes.TYPE, "error")
+                .setAttribute(ref, "R1")
+                .build());
+
+        // Dump an arbitrary response for the second connection
+        String expected2 = conn2.getRequest().getBody().toXML();
+        conn2.sendResponse(ComposableBody.builder()
+                .setNamespaceDefinition("test", testURI)
+                .setAttribute(ref, "R2")
+                .build());
+
+        // We should now receive requests which are duplicates of msg 1 and 2
+
+        // Get msg 1 duplicate
+        conn = cm.awaitConnection();
+        String actual1 = conn.getRequest().getBody().toXML();
+        conn.sendResponse(ComposableBody.builder()
+                .setNamespaceDefinition("test", testURI)
+                .setAttribute(ref, "R3")
+                .build());
+        assertEquals(expected1, actual1);
+
+        // Get msg 2 duplicate
+        conn = cm.awaitConnection();
+        String actual2 = conn.getRequest().getBody().toXML();
+        conn.sendResponse(ComposableBody.builder()
+                .setNamespaceDefinition("test", testURI)
+                .setAttribute(ref, "R4")
+                .build());
+        assertEquals(expected2, actual2);
+        session.drain();
+
+        assertValidators(scr);
+    }
 
     ///////////////////////////////////////////////////////////////////////////
     // XEP-0124 Section 17.4: XML Payload Conditions

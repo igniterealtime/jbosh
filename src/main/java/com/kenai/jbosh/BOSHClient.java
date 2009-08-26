@@ -390,9 +390,9 @@ public final class BOSHClient {
             lock.unlock();
         }
         AbstractBody finalReq = exch.getRequest();
-        fireRequestSent(finalReq);
         HTTPResponse resp = httpSender.send(params, finalReq);
         exch.setHTTPResponse(resp);
+        fireRequestSent(finalReq);
     }
 
     /**
@@ -809,7 +809,7 @@ public final class BOSHClient {
         // Process the message with the current session state
         AbstractBody req = exch.getRequest();
         CMSessionParams params;
-        HTTPExchange resend = null;
+        List<HTTPExchange> toResend = null;
         boolean sessionEstablished = false;
         lock.lock();
         try {
@@ -827,11 +827,28 @@ public final class BOSHClient {
             } else {
                 if (isRecoverableBindingCondition(body)) {
                     // Retransmit outstanding requests
+                    if (toResend == null) {
+                        toResend = new ArrayList<HTTPExchange>(exchanges.size());
+                    }
+                    for (HTTPExchange exchange : exchanges) {
+                        HTTPExchange resendExch =
+                                new HTTPExchange(exchange.getRequest());
+                        toResend.add(resendExch);
+                    }
+                    for (HTTPExchange exchange : toResend) {
+                        exchanges.add(exchange);
+                    }
                 } else {
                     // Process message as normal
                     processRequestAcknowledgements(req, body);
                     processResponseAcknowledgementData(req);
-                    resend = processResponseAcknowledgementReport(body);
+                    HTTPExchange resendExch =
+                            processResponseAcknowledgementReport(body);
+                    if (resendExch != null && toResend == null) {
+                        toResend = new ArrayList<HTTPExchange>(1);
+                        toResend.add(resendExch);
+                        exchanges.add(resendExch);
+                    }
                 }
             }
         } catch (BOSHException boshx) {
@@ -851,11 +868,12 @@ public final class BOSHClient {
             fireConnectionEstablished();
         }
 
-        if (resend != null) {
-            AbstractBody finalReq = resend.getRequest();
-            fireRequestSent(finalReq);
-            HTTPResponse response = httpSender.send(params, finalReq);
-            resend.setHTTPResponse(response);
+        if (toResend != null) {
+            for (HTTPExchange resend : toResend) {
+                HTTPResponse response =
+                        httpSender.send(params, resend.getRequest());
+                resend.setHTTPResponse(response);
+            }
         }
     }
 
