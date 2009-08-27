@@ -223,12 +223,12 @@ public class XEP0124Section17Test extends AbstractBOSHTest {
         // Send a couple requests
         session.send(ComposableBody.builder()
                 .setNamespaceDefinition("test", testURI)
-                .setAttribute(ref, "S1")
+                .setAttribute(ref, "Req1")
                 .build());
         StubConnection conn1 = cm.awaitConnection();
         session.send(ComposableBody.builder()
                 .setNamespaceDefinition("test", testURI)
-                .setAttribute(ref, "S2")
+                .setAttribute(ref, "Req2")
                 .build());
         StubConnection conn2 = cm.awaitConnection();
 
@@ -237,14 +237,14 @@ public class XEP0124Section17Test extends AbstractBOSHTest {
         conn1.sendResponse(ComposableBody.builder()
                 .setNamespaceDefinition("test", testURI)
                 .setAttribute(Attributes.TYPE, "error")
-                .setAttribute(ref, "R1")
+                .setAttribute(ref, "Resp1")
                 .build());
 
         // Dump an arbitrary response for the second connection
         String expected2 = conn2.getRequest().getBody().toXML();
         conn2.sendResponse(ComposableBody.builder()
                 .setNamespaceDefinition("test", testURI)
-                .setAttribute(ref, "R2")
+                .setAttribute(ref, "Resp2")
                 .build());
 
         // We should now receive requests which are duplicates of msg 1 and 2
@@ -254,7 +254,7 @@ public class XEP0124Section17Test extends AbstractBOSHTest {
         String actual1 = conn.getRequest().getBody().toXML();
         conn.sendResponse(ComposableBody.builder()
                 .setNamespaceDefinition("test", testURI)
-                .setAttribute(ref, "R3")
+                .setAttribute(ref, "Resp3")
                 .build());
         assertEquals(expected1, actual1);
 
@@ -263,7 +263,7 @@ public class XEP0124Section17Test extends AbstractBOSHTest {
         String actual2 = conn.getRequest().getBody().toXML();
         conn.sendResponse(ComposableBody.builder()
                 .setNamespaceDefinition("test", testURI)
-                .setAttribute(ref, "R4")
+                .setAttribute(ref, "Resp4")
                 .build());
         assertEquals(expected2, actual2);
         session.drain();

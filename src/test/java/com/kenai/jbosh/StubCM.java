@@ -21,9 +21,13 @@ import java.net.ServerSocket;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.xlightweb.BadMessageException;
 import org.xlightweb.IHttpExchange;
 import org.xlightweb.IHttpRequestHandler;
@@ -37,12 +41,16 @@ import org.xlightweb.server.HttpServer;
  */
 public class StubCM {
 
+    private static final Logger LOG =
+            Logger.getLogger(StubCM.class.getName());
     private final HttpServer server;
     private final int port;
     private final Lock lock = new ReentrantLock();
     private final Condition notEmpty = lock.newCondition();
     private final List<StubConnection> list = new ArrayList<StubConnection>();
     private final List<StubConnection> all = new ArrayList<StubConnection>();
+    private final Set<StubCMListener> listeners =
+            new CopyOnWriteArraySet<StubCMListener>();
 
     ///////////////////////////////////////////////////////////////////////////
     // Classes:
@@ -50,16 +58,22 @@ public class StubCM {
     private class ReqHandler implements IHttpRequestHandler {
         public void onRequest(IHttpExchange exchange)
                 throws IOException, BadMessageException {
-            StubConnection conn = new StubConnection(exchange);
-            lock.lock();
             try {
-                list.add(conn);
-                all.add(conn);
-                notEmpty.signalAll();
-            } finally {
-                lock.unlock();
+                StubConnection conn = new StubConnection(exchange);
+                fireReceived(conn);
+                lock.lock();
+                try {
+                    list.add(conn);
+                    all.add(conn);
+                    notEmpty.signalAll();
+                } finally {
+                    lock.unlock();
+                }
+                conn.executeResponse();
+                fireCompleted(conn);
+            } catch (Throwable thr) {
+                LOG.log(Level.WARNING, "Uncaught throwable", thr);
             }
-            conn.executeResponse();
         }
     }
 
@@ -74,6 +88,14 @@ public class StubCM {
 
     ///////////////////////////////////////////////////////////////////////////
     // Public methods:
+
+    public void addStubCMListener(final StubCMListener listener) {
+        listeners.add(listener);
+    }
+
+    public void removeStubCMListener(final StubCMListener listener) {
+        listeners.remove(listener);
+    }
 
     public URI getURI() {
         return URI.create("http://localhost:" + port + "/");
@@ -133,6 +155,18 @@ public class StubCM {
             }
             port++;
         } while(true);
+    }
+
+    private void fireReceived(final StubConnection conn) {
+        for (StubCMListener listener : listeners) {
+            listener.requestReceived(conn);
+        }
+    }
+
+    private void fireCompleted(final StubConnection conn) {
+        for (StubCMListener listener : listeners) {
+            listener.requestCompleted(conn);
+        }
     }
 
 }

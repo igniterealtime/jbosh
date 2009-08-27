@@ -20,11 +20,11 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
 import javax.xml.XMLConstants;
@@ -84,7 +84,7 @@ public class RequestValidator implements BOSHClientRequestListener {
      */
     public void requestSent(final BOSHMessageEvent event) {
         if (requests == null) {
-            requests = new ArrayList<AbstractBody>();
+            requests = new CopyOnWriteArrayList<AbstractBody>();
         }
         requests.add(event.getBody());
     }
@@ -236,7 +236,8 @@ public class RequestValidator implements BOSHClientRequestListener {
      */
     private void assertNoComments(final AbstractBody body) {
         NodeList nSet;
-        nSet = (NodeList) bodyXPath(body, "//comment()", XPathConstants.NODESET);
+        nSet = (NodeList) bodyXPath(
+                body, "//comment()", XPathConstants.NODESET);
         assertEquals("XML comment count", 0, nSet.getLength());
     }
 
@@ -247,7 +248,8 @@ public class RequestValidator implements BOSHClientRequestListener {
      */
     private void assertNoProcessingInstructions(final AbstractBody body) {
         NodeList nSet;
-        nSet = (NodeList) bodyXPath(body, "//processing-instruction()", XPathConstants.NODESET);
+        nSet = (NodeList) bodyXPath(
+                body, "//processing-instruction()", XPathConstants.NODESET);
         assertEquals("Processing instruction count", 0, nSet.getLength());
     }
 
@@ -255,7 +257,8 @@ public class RequestValidator implements BOSHClientRequestListener {
      * The <body/> element of every client request MUST possess a sequential
      * request ID encapsulated via the 'rid' attribute.
      */
-    private void assertRequestIDSequential(final AbstractBody body, final AbstractBody previous) {
+    private void assertRequestIDSequential(
+            final AbstractBody body, final AbstractBody previous) {
         String ridStr = body.getAttribute(Attributes.RID);
         assertNotNull("Request ID attribute not present", ridStr);
 

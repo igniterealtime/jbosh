@@ -122,12 +122,14 @@ final class BodyParserXmlPull implements BodyParser {
                 break;
             }
             return result;
+        } catch (RuntimeException rtx) {
+            thrown = rtx;
         } catch (XmlPullParserException xmlppx) {
             thrown = xmlppx;
         } catch (IOException iox) {
             thrown = iox;
         }
-        throw(new BOSHException("Could not parse body", thrown));
+        throw(new BOSHException("Could not parse body:\n" + xml, thrown));
     }
 
     ///////////////////////////////////////////////////////////////////////////

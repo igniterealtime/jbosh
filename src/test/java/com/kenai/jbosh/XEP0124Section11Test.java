@@ -16,7 +16,11 @@
 
 package com.kenai.jbosh;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Test;
+import static junit.framework.Assert.*;
 
 /**
  * BOSH XEP-0124 specification section 11 tests:  Overactivity.
@@ -28,18 +32,120 @@ public class XEP0124Section11Test extends AbstractBOSHTest {
      * the 'requests' attribute in the connection manager's Session Creation
      * Response.
      */
-    @Test
-    public void maxRequestsOutstanding() {
-        // TODO: Implement test to ensure the number of outstanding requests
-        // never exeeds the maximum.
+    @Test(timeout=3000)
+    public void maxRequestsOutstanding() throws Exception {
+        logTestStart();
+
+        // Initiate a new session, accepting 2 concurrent connections
+        session.send(ComposableBody.builder().build());
+        StubConnection conn = cm.awaitConnection();
+        final AbstractBody scr = ComposableBody.builder()
+                .setAttribute(Attributes.SID, "123XYZ")
+                .setAttribute(Attributes.WAIT, "1")
+                .setAttribute(Attributes.REQUESTS, "2")
+                .setAttribute(Attributes.INACTIVITY, "5")
+                .build();
+        conn.sendResponse(scr);
+        CMSessionParams params;
+        while ((params = session.getCMSessionParams()) == null) {
+            Thread.yield();
+        }
+
+        // Establish the max number of connections
+        final ComposableBody resp = ComposableBody.builder()
+            .setAttribute(Attributes.SID, scr.getAttribute(Attributes.SID))
+            .build();
+
+        List<StubConnection> outstanding = new ArrayList<StubConnection>();
+        for (int i=0; i<params.getRequests().intValue(); i++) {
+            session.send(ComposableBody.builder().build());
+            outstanding.add(cm.awaitConnection());
+        }
+        
+        final AtomicBoolean completed = new AtomicBoolean();
+        Thread thr = new Thread(new Runnable() {
+            public void run() {
+                try {
+                session.send(ComposableBody.builder().build());
+                    StubConnection conn3 = cm.awaitConnection();
+                    conn3.sendResponse(resp);
+                } catch (Throwable thr) {
+                    // Ignore.  It will register as a failure anyhow.
+                } finally {
+                    completed.set(true);
+                }
+            }
+        });
+
+        boolean pass = false;
+        try {
+            thr.start();
+            try {
+                // If we havent completed after 1.5 seconds, that's good
+                Thread.sleep(1500);
+                pass = thr.isAlive();
+            } catch (InterruptedException intx) {
+                // Not expected
+            }
+        } finally {
+            thr.interrupt();
+        }
+
+        // Cleanup
+        for (StubConnection connection : outstanding) {
+            connection.sendResponse(resp);
+        }
+
+        assertTrue("Did not block until concurrent dropped below max", pass);
+        assertValidators(scr);
     }
 
     /*
      * The client MAY make one additional request if it is to pause or
      * terminate a session.
      */
-    // TODO: Test getting to max and then attempting to exceed with a pause
-    // or terminate request
+
+    @Test(timeout=3000)
+    public void maxRequestsPlusTerminate() throws Exception {
+        logTestStart();
+
+        // Initiate a new session, accepting 2 concurrent connections
+        session.send(ComposableBody.builder().build());
+        StubConnection conn = cm.awaitConnection();
+        final AbstractBody scr = ComposableBody.builder()
+                .setAttribute(Attributes.SID, "123XYZ")
+                .setAttribute(Attributes.WAIT, "1")
+                .setAttribute(Attributes.REQUESTS, "2")
+                .build();
+        conn.sendResponse(scr);
+        CMSessionParams params;
+        while ((params = session.getCMSessionParams()) == null) {
+            Thread.yield();
+        }
+
+        // Establish the max number of connections
+        final ComposableBody resp = ComposableBody.builder()
+            .setAttribute(Attributes.SID, scr.getAttribute(Attributes.SID))
+            .build();
+
+        List<StubConnection> outstanding = new ArrayList<StubConnection>();
+        for (int i=0; i<params.getRequests().intValue(); i++) {
+            session.send(ComposableBody.builder().build());
+            outstanding.add(cm.awaitConnection());
+        }
+
+        // Now send a session termination.  This shouldn't block.
+        session.disconnect();
+
+        // Cleanup
+        for (StubConnection connection : outstanding) {
+            connection.sendResponse(resp);
+        }
+
+        assertValidators(scr);
+    }
+
+    // TODO: Add max+1 test for session pause
 
     /*
      * If during any period the client sends a sequence of new requests (i.e.

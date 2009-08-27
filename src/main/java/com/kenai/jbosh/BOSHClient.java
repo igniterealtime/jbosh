@@ -796,7 +796,7 @@ public final class BOSHClient {
             body = resp.getBody();
             respCode = resp.getHTTPStatus();
         } catch (BOSHException boshx) {
-            LOG.log(Level.WARNING, "Could not obtain response", boshx);
+            LOG.log(Level.FINEST, "Could not obtain response", boshx);
             dispose(boshx);
             return;
         } catch (InterruptedException intx) {
