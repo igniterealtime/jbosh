@@ -29,7 +29,7 @@ public class RequestIDSequenceTest {
      * is observed.  This is an arbitrary, large value and is not explicitly
      * called out by XEP-0124.
      */
-    private static final int ITERATIONS = 150000;
+    private static final int ITERATIONS = 50000;
 
     /**
      * Maximum allowed value that we should never exceed.
