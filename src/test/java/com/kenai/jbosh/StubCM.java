@@ -69,8 +69,8 @@ public class StubCM {
                 } finally {
                     lock.unlock();
                 }
-                conn.executeResponse();
                 fireCompleted(conn);
+                conn.executeResponse();
             } catch (Throwable thr) {
                 LOG.log(Level.WARNING, "Uncaught throwable", thr);
             }

@@ -16,6 +16,9 @@
 
 package com.kenai.jbosh;
 
+import com.kenai.jbosh.BOSHClient.ExchangeInterceptor;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Logger;
 import org.junit.Test;
 import static junit.framework.Assert.*;
 
@@ -24,19 +27,52 @@ import static junit.framework.Assert.*;
  */
 public class XEP0124Section10Test extends AbstractBOSHTest {
 
+    private static final Logger LOG = Logger.getLogger(
+            XEP0124Section10Test.class.getName());
     /*
      * After receiving a response from the connection manager, if none of the
      * client's requests are still being held by the connection manager (and
      * if the session is not a Polling Session), the client SHOULD make a new
      * request as soon as possible.
      */
-    // TODO: Implement empty requests on no outstanding connections
+
+    @Test(timeout=5000)
+    public void inactiveSessionDelay() throws Exception {
+        logTestStart();
+        testedBy(ConnectionValidator.class, "scheduleMaxDelayTask");
+        final int maxTimeAllowed = 500;
+
+        // Initiate a new session
+        session.send(ComposableBody.builder().build());
+        StubConnection conn = cm.awaitConnection();
+        AbstractBody scr = ComposableBody.builder()
+                .setAttribute(Attributes.SID, "123XYZ")
+                .setAttribute(Attributes.WAIT, "1")
+                .setAttribute(Attributes.INACTIVITY, "1")
+                .build();
+        conn.sendResponse(scr);
+        session.drain();
+
+        // Now wait to see how long before we receive an empty request...
+        long start = System.currentTimeMillis();
+        cm.awaitConnection();
+        long end = System.currentTimeMillis();
+        if (end - start > maxTimeAllowed) {
+            fail("Idle message took " + (end - start) + "ms to arrive.  "
+                    + "Max allowed: " + maxTimeAllowed);
+        }
+
+        assertValidators(scr);
+    }
 
     /*
      * If no client requests are being held, the client MUST make a new request
      * before the maximum inactivity period has expired.
      */
-    // TODO: Implement empty requests on no outstanding connections
+    @Test(timeout=5000)
+    public void inactiveSession() throws Exception {
+        testedBy(ConnectionValidator.class, "scheduleMaxDelayTask");
+    }
 
     /*
      * If the connection manager has responded to all the requests it has
@@ -111,6 +147,7 @@ public class XEP0124Section10Test extends AbstractBOSHTest {
             assertValidators(scr);
             failed = true;
         } catch (AssertionError err) {
+            LOG.info("Received expected error: " + err.getMessage());
             failed = false;
         }
         if (failed) {

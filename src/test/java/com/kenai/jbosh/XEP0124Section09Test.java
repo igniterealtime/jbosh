@@ -181,7 +181,6 @@ public class XEP0124Section09Test extends AbstractBOSHTest {
         body = conn.getRequest().getBody();
         val = body.getAttribute(Attributes.ACK);
         assertNull("second request should not have an ack", val);
-        session.drain();
 
         // Send another packet and verify ack of initial request only
         session.send(ComposableBody.builder().build());

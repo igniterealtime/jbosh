@@ -58,6 +58,7 @@ public abstract class AbstractBOSHTest {
         cm.dispose();
         connValidator = null;
         LOG.info("Stub CM disposed of");
+        session.close();
     }
 
     ///////////////////////////////////////////////////////////////////////////

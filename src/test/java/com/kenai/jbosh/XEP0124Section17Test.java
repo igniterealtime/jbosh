@@ -219,6 +219,25 @@ public class XEP0124Section17Test extends AbstractBOSHTest {
                 .setAttribute(Attributes.REQUESTS, "3")
                 .build();
         conn.sendResponse(scr);
+        session.drain();
+
+        /*
+         * For testing purposes, try to ensure that the retransmitted
+         * messages arrive in the intended order.  Without this, the
+         * race condition becomes close enough to notice.  In
+         * production, the CM would normally know how to respond to
+         * out of order request receipt.
+         */
+        session.addBOSHClientRequestListener(new BOSHClientRequestListener() {
+            public void requestSent(BOSHMessageEvent event) {
+                // Add a delay to enforce intended message ordering
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException intx) {
+                    // Ignore
+                }
+            }
+        });
 
         // Send a couple requests
         session.send(ComposableBody.builder()
@@ -232,19 +251,19 @@ public class XEP0124Section17Test extends AbstractBOSHTest {
                 .build());
         StubConnection conn2 = cm.awaitConnection();
 
+        // Dump an arbitrary response for the second connection
+        String expected2 = conn2.getRequest().getBody().toXML();
+        conn2.sendResponse(ComposableBody.builder()
+                .setNamespaceDefinition("test", testURI)
+                .setAttribute(ref, "Resp2")
+                .build());
+
         // Now respond to the first request with a recoverable error
         String expected1 = conn1.getRequest().getBody().toXML();
         conn1.sendResponse(ComposableBody.builder()
                 .setNamespaceDefinition("test", testURI)
                 .setAttribute(Attributes.TYPE, "error")
                 .setAttribute(ref, "Resp1")
-                .build());
-
-        // Dump an arbitrary response for the second connection
-        String expected2 = conn2.getRequest().getBody().toXML();
-        conn2.sendResponse(ComposableBody.builder()
-                .setNamespaceDefinition("test", testURI)
-                .setAttribute(ref, "Resp2")
                 .build());
 
         // We should now receive requests which are duplicates of msg 1 and 2
@@ -267,8 +286,6 @@ public class XEP0124Section17Test extends AbstractBOSHTest {
                 .build());
         assertEquals(expected2, actual2);
         session.drain();
-
-        assertValidators(scr);
     }
 
     ///////////////////////////////////////////////////////////////////////////

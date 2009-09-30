@@ -26,9 +26,13 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -114,6 +118,24 @@ public final class BOSHClient {
     private static final String INTERRUPTED = "Interrupted";
 
     /**
+     * Default empty request delay.
+     */
+    private static final int DEFAULT_EMPTY_REQUEST_DELAY = 100;
+
+    /**
+     * Amount of time to wait before sending an empty request, in
+     * milliseconds.
+     */
+    private static final int EMPTY_REQUEST_DELAY = Integer.getInteger(
+            BOSHClient.class.getName() + ".emptyRequestDelay",
+            DEFAULT_EMPTY_REQUEST_DELAY);
+
+    /**
+     * Flag indicating whether or not we want to perform assertions.
+     */
+    private static final boolean ASSERTIONS;
+
+    /**
      * Connection listeners.
      */
     private final Set<BOSHClientConnListener> connListeners =
@@ -134,7 +156,7 @@ public final class BOSHClient {
     /**
      * Lock instance.
      */
-    private final Lock lock = new ReentrantLock();
+    private final ReentrantLock lock = new ReentrantLock();
 
     /**
      * Condition indicating that there are messages to be exchanged.
@@ -146,6 +168,11 @@ public final class BOSHClient {
      * messages.
      */
     private final Condition notFull = lock.newCondition();
+
+    /**
+     * Condition indicating that there are no outstanding connections.
+     */
+    private final Condition drained = lock.newCondition();
 
     /**
      * Session configuration.
@@ -161,6 +188,18 @@ public final class BOSHClient {
          */
         public void run() {
             processMessages();
+        }
+    };
+
+    /**
+     * Processor thread runnable instance.
+     */
+    private final Runnable emptyRequestRunnable = new Runnable() {
+        /**
+         * Process incoming messages.
+         */
+        public void run() {
+            sendEmptyRequest();
         }
     };
 
@@ -181,6 +220,11 @@ public final class BOSHClient {
      */
     private final RequestIDSequence requestIDSeq = new RequestIDSequence();
 
+    /**
+     * ScheduledExcecutor to use for deferred tasks.
+     */
+    private final ScheduledExecutorService schedExec =
+            Executors.newSingleThreadScheduledExecutor();
 
     /************************************************************
      * The following vars must be accessed via the lock instance.
@@ -191,6 +235,11 @@ public final class BOSHClient {
      * manager.  Becomes null when session is terminated.
      */
     private Thread procThread;
+
+    /**
+     * Future for sending a deferred empty request, if needed.
+     */
+    private ScheduledFuture emptyRequestFuture;
 
     /**
      * Connection Manager session parameters.  Only available when in a
@@ -221,7 +270,7 @@ public final class BOSHClient {
      */
     private List<ComposableBody> pendingRequestAcks =
             new ArrayList<ComposableBody>();
-    
+
     ///////////////////////////////////////////////////////////////////////////
     // Classes:
 
@@ -251,6 +300,23 @@ public final class BOSHClient {
     // Constructors:
 
     /**
+     * Determine whether or not we should perform assertions.  Assertions
+     * can be specified via system property explicitly, or defaulted to
+     * the JVM assertions status.
+     */
+    static {
+        final String prop =
+                BOSHClient.class.getSimpleName() + ".assertionsEnabled";
+        boolean enabled = false;
+        if (System.getProperty(prop) == null) {
+            assert enabled = true;
+        } else {
+            enabled = Boolean.getBoolean(prop);
+        }
+        ASSERTIONS = enabled;
+    }
+
+    /**
      * Prevent direct construction.
      */
     private BOSHClient(final BOSHClientConfig sessCfg) {
@@ -269,6 +335,10 @@ public final class BOSHClient {
      * @return BOSH session instance
      */
     public static BOSHClient create(final BOSHClientConfig clientCfg) {
+        if (clientCfg == null) {
+            throw(new IllegalArgumentException(
+                    "Client configuration may not be null"));
+        }
         return new BOSHClient(clientCfg);
     }
 
@@ -289,6 +359,10 @@ public final class BOSHClient {
      */
     public void addBOSHClientConnListener(
             final BOSHClientConnListener listener) {
+        if (listener == null) {
+            throw(new IllegalArgumentException(
+                    "Listener may not be null"));
+        }
         connListeners.add(listener);
     }
 
@@ -299,6 +373,10 @@ public final class BOSHClient {
      */
     public void removeBOSHClientConnListener(
             final BOSHClientConnListener listener) {
+        if (listener == null) {
+            throw(new IllegalArgumentException(
+                    "Listener may not be null"));
+        }
         connListeners.remove(listener);
     }
 
@@ -309,6 +387,10 @@ public final class BOSHClient {
      */
     public void addBOSHClientRequestListener(
             final BOSHClientRequestListener listener) {
+        if (listener == null) {
+            throw(new IllegalArgumentException(
+                    "Listener may not be null"));
+        }
         requestListeners.add(listener);
     }
 
@@ -320,6 +402,10 @@ public final class BOSHClient {
      */
     public void removeBOSHClientRequestListener(
             final BOSHClientRequestListener listener) {
+        if (listener == null) {
+            throw(new IllegalArgumentException(
+                    "Listener may not be null"));
+        }
         requestListeners.remove(listener);
     }
 
@@ -330,6 +416,10 @@ public final class BOSHClient {
      */
     public void addBOSHClientResponseListener(
             final BOSHClientResponseListener listener) {
+        if (listener == null) {
+            throw(new IllegalArgumentException(
+                    "Listener may not be null"));
+        }
         responseListeners.add(listener);
     }
 
@@ -341,6 +431,10 @@ public final class BOSHClient {
      */
     public void removeBOSHClientResponseListener(
             final BOSHClientResponseListener listener) {
+        if (listener == null) {
+            throw(new IllegalArgumentException(
+                    "Listener may not be null"));
+        }
         responseListeners.remove(listener);
     }
 
@@ -361,6 +455,11 @@ public final class BOSHClient {
      * @throws BOSHException on message transmission failure
      */
     public void send(final ComposableBody body) throws BOSHException {
+        if (body == null) {
+            throw(new IllegalArgumentException(
+                    "Message body may not be null"));
+        }
+
         HTTPExchange exch;
         CMSessionParams params;
         lock.lock();
@@ -386,6 +485,7 @@ public final class BOSHClient {
             exch = new HTTPExchange(request);
             exchanges.add(exch);
             notEmpty.signalAll();
+            clearEmptyRequest();
         } finally {
             lock.unlock();
         }
@@ -414,9 +514,25 @@ public final class BOSHClient {
      * @throws BOSHException when termination message cannot be sent
      */
     public void disconnect(final ComposableBody msg) throws BOSHException {
+        if (msg == null) {
+            throw(new IllegalArgumentException(
+                    "Message body may not be null"));
+        }
+
         Builder builder = msg.rebuild();
         builder.setAttribute(Attributes.TYPE, TERMINATE);
         send(builder.build());
+    }
+
+    /**
+     * Forcibly close this client session instance.  The preferred mechanism
+     * to close the connection is to send a disconnect message and wait for
+     * organic termination.  Calling this method simply shuts down the local
+     * session without sending a termination message, releasing all resources
+     * associated with the session.
+     */
+    public void close() {
+        dispose(new BOSHException("Session explicitly closed by caller"));
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -442,13 +558,17 @@ public final class BOSHClient {
     void drain() {
         lock.lock();
         try {
-            while (!exchanges.isEmpty()) {
+            LOG.finest("Waiting while draining...");
+            while (isWorking()
+                    && (emptyRequestFuture == null
+                    || emptyRequestFuture.isDone())) {
                 try {
-                    notFull.await();
+                    drained.await();
                 } catch (InterruptedException intx) {
                     LOG.log(Level.FINEST, INTERRUPTED, intx);
                 }
             }
+            LOG.finest("Drained");
         } finally {
             lock.unlock();
         }
@@ -472,6 +592,8 @@ public final class BOSHClient {
      * transport implementation and starts the receive thread.
      */
     private void init() {
+        assertUnlocked();
+        
         lock.lock();
         try {
             httpSender.init(cfg);
@@ -493,20 +615,41 @@ public final class BOSHClient {
      *  for normal termination
      */
     private void dispose(final Throwable cause) {
+        assertUnlocked();
+        
         lock.lock();
         try {
-            notEmpty.signalAll();
-            notFull.signalAll();
+            if (procThread == null) {
+                // Already disposed
+                return;
+            }
             procThread = null;
         } finally {
             lock.unlock();
         }
-        httpSender.destroy();
+
         if (cause == null) {
             fireConnectionClosed();
         } else {
             fireConnectionClosedOnError(cause);
         }
+
+        lock.lock();
+        try {
+            clearEmptyRequest();
+            exchanges = null;
+            cmParams = null;
+            pendingResponseAcks = null;
+            pendingRequestAcks = null;
+            notEmpty.signalAll();
+            notFull.signalAll();
+            drained.signalAll();
+        } finally {
+            lock.unlock();
+        }
+        
+        httpSender.destroy();
+        schedExec.shutdownNow();
     }
 
     /**
@@ -517,7 +660,7 @@ public final class BOSHClient {
      * @return {@code true} if the message is a pause request, {@code false}
      *  otherwise
      */
-    private boolean isPause(final AbstractBody msg) {
+    private static boolean isPause(final AbstractBody msg) {
         return msg.getAttribute(Attributes.PAUSE) != null;
     }
     
@@ -529,7 +672,7 @@ public final class BOSHClient {
      * @return {@code true} if the message is a session termination,
      *  {@code false} otherwise
      */
-    private boolean isTermination(final AbstractBody msg) {
+    private static boolean isTermination(final AbstractBody msg) {
         return TERMINATE.equals(msg.getAttribute(Attributes.TYPE));
     }
 
@@ -545,6 +688,8 @@ public final class BOSHClient {
     private TerminalBindingCondition getTerminalBindingCondition(
             final int respCode,
             final AbstractBody respBody) {
+        assertLocked();
+
         if (isTermination(respBody)) {
             String str = respBody.getAttribute(Attributes.CONDITION);
             return TerminalBindingCondition.forString(str);
@@ -565,6 +710,8 @@ public final class BOSHClient {
      *  {@code false} otherwise
      */
     private boolean isImmediatelySendable(final AbstractBody msg) {
+        assertLocked();
+
         if (cmParams == null) {
             // block if we're waiting for a response to our first request
             return exchanges.isEmpty();
@@ -592,6 +739,8 @@ public final class BOSHClient {
      * @return {@code true} if it is, {@code false} otherwise
      */
     private boolean isWorking() {
+        assertLocked();
+
         return procThread != null;
     }
 
@@ -602,6 +751,8 @@ public final class BOSHClient {
      * @param msg message to evaluate
      */
     private void blockUntilSendable(final AbstractBody msg) {
+        assertLocked();
+
         while (isWorking() && !isImmediatelySendable(msg)) {
             try {
                 notFull.await();
@@ -621,6 +772,8 @@ public final class BOSHClient {
      */
     private ComposableBody applySessionCreationRequest(
             final long rid, final ComposableBody orig) throws BOSHException {
+        assertLocked();
+        
         Builder builder = orig.rebuild();
         builder.setAttribute(Attributes.TO, cfg.getTo());
         builder.setAttribute(Attributes.XML_LANG, cfg.getLang());
@@ -645,6 +798,8 @@ public final class BOSHClient {
      * @param builder builder instance to add routing information to
      */
     private void applyRoute(final Builder builder) {
+        assertLocked();
+        
         String route = cfg.getRoute();
         if (route != null) {
             builder.setAttribute(Attributes.ROUTE, route);
@@ -658,6 +813,8 @@ public final class BOSHClient {
      * @param builder builder instance to add station ID information to
      */
     private void applyFrom(final Builder builder) {
+        assertLocked();
+
         String from = cfg.getFrom();
         if (from != null) {
             builder.setAttribute(Attributes.FROM, from);
@@ -677,6 +834,8 @@ public final class BOSHClient {
     private ComposableBody applySessionData(
             final long rid,
             final ComposableBody orig) throws BOSHException {
+        assertLocked();
+
         Builder builder = orig.rebuild();
         builder.setAttribute(Attributes.SID,
                 cmParams.getSessionID().toString());
@@ -699,6 +858,8 @@ public final class BOSHClient {
     private void applyResponseAcknowledgement(
             final Builder builder,
             final long rid) {
+        assertLocked();
+
         if (responseAck.equals(Long.valueOf(-1L))) {
             // We have not received any responses yet
             return;
@@ -737,6 +898,12 @@ public final class BOSHClient {
                                 + "of test hook: RID="
                                 + exch.getRequest().getAttribute(
                                     Attributes.RID));
+                        lock.lock();
+                        try {
+                            exchanges.remove(exch);
+                        } finally {
+                            lock.unlock();
+                        }
                         continue;
                     }
                     exch = newExch;
@@ -758,6 +925,8 @@ public final class BOSHClient {
      *  exchanges are immediately available
      */
     private HTTPExchange nextExchange() {
+        assertUnlocked();
+
         final Thread thread = Thread.currentThread();
         HTTPExchange exch = null;
         lock.lock();
@@ -788,6 +957,8 @@ public final class BOSHClient {
      * @param exch message exchange to process
      */
     private void processExchange(final HTTPExchange exch) {
+        assertUnlocked();
+
         HTTPResponse resp;
         AbstractBody body;
         int respCode;
@@ -810,62 +981,67 @@ public final class BOSHClient {
         AbstractBody req = exch.getRequest();
         CMSessionParams params;
         List<HTTPExchange> toResend = null;
-        boolean sessionEstablished = false;
+        boolean noOutstanding;
         lock.lock();
         try {
             // Check for session creation response info, if needed
             if (cmParams == null) {
                 cmParams = CMSessionParams.fromSessionInit(req, body);
-                sessionEstablished = true;
+                fireConnectionEstablished();
             }
             params = cmParams;
 
             checkForTerminalBindingConditions(body, respCode);
             if (isTermination(body)) {
                 // Explicit termination
+                lock.unlock();
                 dispose(null);
-            } else {
-                if (isRecoverableBindingCondition(body)) {
-                    // Retransmit outstanding requests
-                    if (toResend == null) {
-                        toResend = new ArrayList<HTTPExchange>(exchanges.size());
-                    }
-                    for (HTTPExchange exchange : exchanges) {
-                        HTTPExchange resendExch =
-                                new HTTPExchange(exchange.getRequest());
-                        toResend.add(resendExch);
-                    }
-                    for (HTTPExchange exchange : toResend) {
-                        exchanges.add(exchange);
-                    }
-                } else {
-                    // Process message as normal
-                    processRequestAcknowledgements(req, body);
-                    processResponseAcknowledgementData(req);
+                return;
+            }
+            
+            if (isRecoverableBindingCondition(body)) {
+                // Retransmit outstanding requests
+                if (toResend == null) {
+                    toResend = new ArrayList<HTTPExchange>(exchanges.size());
+                }
+                for (HTTPExchange exchange : exchanges) {
                     HTTPExchange resendExch =
-                            processResponseAcknowledgementReport(body);
-                    if (resendExch != null && toResend == null) {
-                        toResend = new ArrayList<HTTPExchange>(1);
-                        toResend.add(resendExch);
-                        exchanges.add(resendExch);
-                    }
+                            new HTTPExchange(exchange.getRequest());
+                    toResend.add(resendExch);
+                }
+                for (HTTPExchange exchange : toResend) {
+                    exchanges.add(exchange);
+                }
+            } else {
+                // Process message as normal
+                processRequestAcknowledgements(req, body);
+                processResponseAcknowledgementData(req);
+                HTTPExchange resendExch =
+                        processResponseAcknowledgementReport(body);
+                if (resendExch != null && toResend == null) {
+                    toResend = new ArrayList<HTTPExchange>(1);
+                    toResend.add(resendExch);
+                    exchanges.add(resendExch);
                 }
             }
         } catch (BOSHException boshx) {
             LOG.log(Level.FINEST, "Could not process response", boshx);
+            lock.unlock();
             dispose(boshx);
             return;
         } finally {
-            try {
-                exchanges.remove(exch);
-                notFull.signalAll();
-            } finally {
-                lock.unlock();
+            if (lock.isHeldByCurrentThread()) {
+                try {
+                    exchanges.remove(exch);
+                    noOutstanding = exchanges.isEmpty();
+                    if (noOutstanding) {
+                        scheduleEmptyRequest();
+                    }
+                    notFull.signalAll();
+                } finally {
+                    lock.unlock();
+                }
             }
-        }
-
-        if (sessionEstablished) {
-            fireConnectionEstablished();
         }
 
         if (toResend != null) {
@@ -873,7 +1049,76 @@ public final class BOSHClient {
                 HTTPResponse response =
                         httpSender.send(params, resend.getRequest());
                 resend.setHTTPResponse(response);
+                fireRequestSent(resend.getRequest());
             }
+        }
+    }
+    
+    /**
+     * Clears any scheduled empty requests.
+     */
+    private void clearEmptyRequest() {
+        assertLocked();
+
+        if (emptyRequestFuture != null) {
+            emptyRequestFuture.cancel(false);
+            emptyRequestFuture = null;
+        }
+    }
+
+    /**
+     * Schedule an empty request to be sent if no other requests are
+     * sent in a reasonable amount of time.
+     */
+    private void scheduleEmptyRequest() {
+        assertLocked();
+
+        clearEmptyRequest();
+        try {
+            emptyRequestFuture = schedExec.schedule(emptyRequestRunnable,
+                    EMPTY_REQUEST_DELAY, TimeUnit.MILLISECONDS);
+        } catch (RejectedExecutionException rex) {
+            LOG.log(Level.FINEST, "Could not schedule empty request", rex);
+        }
+        drained.signalAll();
+    }
+
+    /**
+     * Sends an empty request to maintain session requirements.  If a request
+     * is sent within a reasonable time window, the empty request transmission
+     * will be cancelled.
+     */
+    private void sendEmptyRequest() {
+        // Send an empty request
+        LOG.finest("Sending empty request");
+        try {
+            send(ComposableBody.builder().build());
+        } catch (BOSHException boshx) {
+            dispose(boshx);
+        }
+    }
+
+    /**
+     * Assert that the internal lock is held.
+     */
+    private void assertLocked() {
+        if (ASSERTIONS) {
+            if (!lock.isHeldByCurrentThread()) {
+                throw(new AssertionError("Lock is not held by current thread"));
+            }
+            return;
+        }
+    }
+
+    /**
+     * Assert that the internal lock is *not* held.
+     */
+    private void assertUnlocked() {
+        if (ASSERTIONS) {
+            if (lock.isHeldByCurrentThread()) {
+                throw(new AssertionError("Lock is held by current thread"));
+            }
+            return;
         }
     }
 
@@ -906,7 +1151,7 @@ public final class BOSHClient {
      * @param resp response body
      * @return {@code true} if it does, {@code false} otherwise
      */
-    private boolean isRecoverableBindingCondition(
+    private static boolean isRecoverableBindingCondition(
             final AbstractBody resp) {
         return ERROR.equals(resp.getAttribute(Attributes.TYPE));
     }
@@ -922,6 +1167,8 @@ public final class BOSHClient {
      */
     private void processRequestAcknowledgements(
             final AbstractBody req, final AbstractBody resp) {
+        assertLocked();
+        
         if (!cmParams.isAckingRequests()) {
             return;
         }
@@ -966,6 +1213,8 @@ public final class BOSHClient {
      */
     private void processResponseAcknowledgementData(
             final AbstractBody req) {
+        assertLocked();
+        
         Long rid = Long.parseLong(req.getAttribute(Attributes.RID));
         if (responseAck.equals(Long.valueOf(-1L))) {
             // This is the first request
@@ -996,6 +1245,8 @@ public final class BOSHClient {
     private HTTPExchange processResponseAcknowledgementReport(
             final AbstractBody resp)
             throws BOSHException {
+        assertLocked();
+        
         String reportStr = resp.getAttribute(Attributes.REPORT);
         if (reportStr == null) {
             // No report on this message
@@ -1041,12 +1292,18 @@ public final class BOSHClient {
      * @param request request being sent
      */
     private void fireRequestSent(final AbstractBody request) {
+        assertUnlocked();
+
         BOSHMessageEvent event = null;
         for (BOSHClientRequestListener listener : requestListeners) {
             if (event == null) {
                 event = BOSHMessageEvent.createRequestSentEvent(this, request);
             }
-            listener.requestSent(event);
+            try {
+                listener.requestSent(event);
+            } catch (Throwable thr) {
+                LOG.log(Level.WARNING, "Unhandled Throwable", thr);
+            }
         }
     }
 
@@ -1057,13 +1314,19 @@ public final class BOSHClient {
      * @param response response received
      */
     private void fireResponseReceived(final AbstractBody response) {
+        assertUnlocked();
+
         BOSHMessageEvent event = null;
         for (BOSHClientResponseListener listener : responseListeners) {
             if (event == null) {
                 event = BOSHMessageEvent.createResponseReceivedEvent(
                         this, response);
             }
-            listener.responseReceived(event);
+            try {
+                listener.responseReceived(event);
+            } catch (Throwable thr) {
+                LOG.log(Level.WARNING, "Unhandled Throwable", thr);
+            }
         }
     }
 
@@ -1072,13 +1335,27 @@ public final class BOSHClient {
      * established.
      */
     private void fireConnectionEstablished() {
-        BOSHClientConnEvent event = null;
-        for (BOSHClientConnListener listener : connListeners) {
-            if (event == null) {
-                event = BOSHClientConnEvent
-                        .createConnectionEstablishedEvent(this);
+        final boolean hadLock = lock.isHeldByCurrentThread();
+        if (hadLock) {
+            lock.unlock();
+        }
+        try {
+            BOSHClientConnEvent event = null;
+            for (BOSHClientConnListener listener : connListeners) {
+                if (event == null) {
+                    event = BOSHClientConnEvent
+                            .createConnectionEstablishedEvent(this);
+                }
+                try {
+                    listener.connectionEvent(event);
+                } catch (Throwable thr) {
+                    LOG.log(Level.WARNING, "Unhandled Throwable", thr);
+                }
             }
-            listener.connectionEvent(event);
+        } finally {
+            if (hadLock) {
+                lock.lock();
+            }
         }
     }
 
@@ -1087,12 +1364,18 @@ public final class BOSHClient {
      * terminated normally.
      */
     private void fireConnectionClosed() {
+        assertUnlocked();
+
         BOSHClientConnEvent event = null;
         for (BOSHClientConnListener listener : connListeners) {
             if (event == null) {
                 event = BOSHClientConnEvent.createConnectionClosedEvent(this);
             }
-            listener.connectionEvent(event);
+            try {
+                listener.connectionEvent(event);
+            } catch (Throwable thr) {
+                LOG.log(Level.WARNING, "Unhandled Throwable", thr);
+            }
         }
     }
 
@@ -1104,6 +1387,8 @@ public final class BOSHClient {
      */
     private void fireConnectionClosedOnError(
             final Throwable cause) {
+        assertUnlocked();
+
         BOSHClientConnEvent event = null;
         for (BOSHClientConnListener listener : connListeners) {
             if (event == null) {
@@ -1111,7 +1396,11 @@ public final class BOSHClient {
                         .createConnectionClosedOnErrorEvent(
                         this, pendingRequestAcks, cause);
             }
-            listener.connectionEvent(event);
+            try {
+                listener.connectionEvent(event);
+            } catch (Throwable thr) {
+                LOG.log(Level.WARNING, "Unhandled Throwable", thr);
+            }
         }
     }
 

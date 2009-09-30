@@ -281,7 +281,7 @@ public final class ConnectionValidator implements StubCMListener {
         }
         try {
             BOSHClient session = client.get();
-            if (client == null) {
+            if (session == null) {
                 // Client not set
                 return;
             }
