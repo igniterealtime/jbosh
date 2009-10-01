@@ -32,6 +32,7 @@ public class StubRequest {
     private final Map<String,String> headers;
     private final AbstractBody body;
     private final boolean secure;
+    private final long requestTime = System.currentTimeMillis();
 
     ///////////////////////////////////////////////////////////////////////////
     // Constructor:
@@ -86,6 +87,10 @@ public class StubRequest {
 
     public boolean isSecure() {
         return secure;
+    }
+
+    public long getRequestTime() {
+        return requestTime;
     }
 
     /**

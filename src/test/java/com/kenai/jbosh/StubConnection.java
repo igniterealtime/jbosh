@@ -34,6 +34,8 @@ public class StubConnection {
     private static final Logger LOG =
             Logger.getLogger(StubConnection.class.getName());
     private final IHttpExchange exchange;
+    private final AtomicReference<HttpResponse> httpResp =
+            new AtomicReference<HttpResponse>();
     private final StubRequest req;
     private final AtomicReference<StubResponse> resp =
             new AtomicReference<StubResponse>();
@@ -106,12 +108,15 @@ public class StubConnection {
         }
         respHead.setContentLength(data.length);
 
+        HttpResponse response = new HttpResponse(respHead, data);
+        if (!httpResp.compareAndSet(null, response)) {
+            throw(new IllegalStateException("HTTP Response already sent"));
+        }
+
         if (!resp.compareAndSet(null,
                 new StubResponse(respHead, respBody))) {
             throw(new IllegalStateException("Response already sent"));
         }
-        HttpResponse response = new HttpResponse(respHead, data);
-        exchange.send(response);
 
         synchronized(this) {
             notifyAll();
@@ -121,7 +126,7 @@ public class StubConnection {
     ///////////////////////////////////////////////////////////////////////////
     // Package methods:
 
-    public void executeResponse() {
+    public void awaitResponse() {
         synchronized(this) {
             while (resp.get() == null) {
                 try {
@@ -131,6 +136,16 @@ public class StubConnection {
                 }
             }
         }
+    }
+
+    public void executeResponse() throws IOException {
+        awaitResponse();
+        HttpResponse hr = httpResp.getAndSet(null);
+        if (hr == null) {
+            // Already executed the response
+            return;
+        }
+        exchange.send(hr);
     }
 
     ///////////////////////////////////////////////////////////////////////////

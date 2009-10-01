@@ -1074,9 +1074,20 @@ public final class BOSHClient {
         assertLocked();
 
         clearEmptyRequest();
+
+        // Figure out how long we should wait before sending an empty request
+        AttrPolling polling = cmParams.getPollingInterval();
+        long delay;
+        if (polling == null) {
+            delay = EMPTY_REQUEST_DELAY;
+        } else {
+            delay = polling.getInMilliseconds();
+        }
+
+        // Schedule the transmission
         try {
             emptyRequestFuture = schedExec.schedule(emptyRequestRunnable,
-                    EMPTY_REQUEST_DELAY, TimeUnit.MILLISECONDS);
+                    delay, TimeUnit.MILLISECONDS);
         } catch (RejectedExecutionException rex) {
             LOG.log(Level.FINEST, "Could not schedule empty request", rex);
         }

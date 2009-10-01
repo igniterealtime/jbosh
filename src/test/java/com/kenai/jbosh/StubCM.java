@@ -69,6 +69,7 @@ public class StubCM {
                 } finally {
                     lock.unlock();
                 }
+                conn.awaitResponse();
                 fireCompleted(conn);
                 conn.executeResponse();
             } catch (Throwable thr) {

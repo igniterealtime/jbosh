@@ -49,5 +49,14 @@ final class AttrPolling extends AbstractIntegerAttr {
             return new AttrPolling(str);
         }
     }
+
+    /**
+     * Get the polling interval in milliseconds.
+     *
+     * @return polling interval in milliseconds
+     */
+    public int getInMilliseconds() {
+        return intValue() * 1000;
+    }
     
 }

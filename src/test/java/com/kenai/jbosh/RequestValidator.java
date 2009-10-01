@@ -487,11 +487,15 @@ public class RequestValidator implements BOSHClientRequestListener {
      * Execute an XPath against a AbstractBody instance.
      */
     private Object bodyXPath(
-            final AbstractBody body, final String xpath, final QName returnType) {
+            final AbstractBody body,
+            final String xpath,
+            final QName returnType) {
         try {
             String xml = body.toXML();
-            ByteArrayInputStream stream = new ByteArrayInputStream(xml.getBytes());
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            ByteArrayInputStream stream =
+                    new ByteArrayInputStream(xml.getBytes());
+            DocumentBuilderFactory factory =
+                    DocumentBuilderFactory.newInstance();
             factory.setNamespaceAware(true);
             DocumentBuilder builder = factory.newDocumentBuilder();
             Document document = builder.parse(stream);

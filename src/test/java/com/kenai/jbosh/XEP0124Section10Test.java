@@ -16,8 +16,6 @@
 
 package com.kenai.jbosh;
 
-import com.kenai.jbosh.BOSHClient.ExchangeInterceptor;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 import org.junit.Test;
 import static junit.framework.Assert.*;

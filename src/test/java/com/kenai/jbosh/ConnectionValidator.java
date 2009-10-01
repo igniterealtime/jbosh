@@ -24,6 +24,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import static org.junit.Assert.*;
 
@@ -82,7 +83,10 @@ public final class ConnectionValidator implements StubCMListener {
 
         conns.add(conn);
         int count = openConnections.incrementAndGet();
-        validateConnectionCount(count);
+        if (LOG.isLoggable(Level.FINEST)) {
+            LOG.finest("CM connections outstanding: " + count);
+        }
+        validateConnectionCount(count, conn);
     }
 
     /**
@@ -94,6 +98,9 @@ public final class ConnectionValidator implements StubCMListener {
             assertTrue("connections >= 0", count >= 0);
         } catch (Error err) {
             toThrow.compareAndSet(null, err);
+        }
+        if (LOG.isLoggable(Level.FINEST)) {
+            LOG.finest("CM connections outstanding: " + count);
         }
         scheduleMaxDelayTask(count);
     }
@@ -125,9 +132,12 @@ public final class ConnectionValidator implements StubCMListener {
         LOG.fine("Validating " + conns.size() + " connections(s)");
         AtomicReference<String> accept = new AtomicReference<String>();
         int index = 0;
+        StubConnection prev = null;
         for (StubConnection conn : conns) {
             LOG.fine("Validating connection #" + index);
             validateConnection(index, conn, accept);
+            validateOveractivePolling(index, conn, prev);
+            prev = conn;
             index++;
         }
     }
@@ -312,8 +322,10 @@ public final class ConnectionValidator implements StubCMListener {
      * Validate the concurrent connection count.
      *
      * @param count current number of outstanding connections
+     * @param conn current connection
      */
-    private void validateConnectionCount(final int count) {
+    private void validateConnectionCount(
+            final int count, final StubConnection conn) {
         try {
             BOSHClient session = client.get();
             int max = 2;
@@ -328,12 +340,115 @@ public final class ConnectionValidator implements StubCMListener {
                     }
                 }
             }
+
+            AbstractBody msg = conn.getRequest().getBody();
+            int extra;
+            if (msg.getAttribute(Attributes.PAUSE) != null
+                    || "terminate".equals(msg.getAttribute(Attributes.TYPE))) {
+                extra = 1;
+            } else {
+                extra = 0;
+            }
+
             assertTrue("concurrent connections must be 0 <= x <= " + max
-                    + " (was: " + count + ")",
-                    count >= 0 && count <= max);
+                    + "+" + extra + " (was: " + count + ")",
+                    count >= 0 && count <= (max + extra));
         } catch (Error err) {
             toThrow.compareAndSet(null, err);
         }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    // XEP-0124 Section 12: Polling Sessions
+
+    /**
+     * If the client sends two consecutive empty new requests (i.e. requests
+     * with incremented rid attributes, not repeat requests) within a period
+     * shorter than the number of seconds specified by the 'polling' attribute
+     * (the shortest allowable polling interval) in the session creation
+     * response, and if the connection manager's response to the first request
+     * contained no payloads, then upon reception of the second request the
+     * connection manager SHOULD terminate the HTTP session and return a
+     * 'policy-violation' terminal binding error to the client.
+     *
+     * @param index connection index
+     * @param conn current connection
+     * @pram previous previous connection
+     */
+    private void validateOveractivePolling(
+            final int index,
+            final StubConnection conn,
+            final StubConnection previous) {
+        BOSHClient session = client.get();
+        if (session == null || previous == null) {
+            // No established session
+            return;
+        }
+
+        ComposableBody prevReq =
+                toComposableBody(previous.getRequest().getBody());
+        ComposableBody req =
+                toComposableBody(conn.getRequest().getBody());
+        String prevIDStr = prevReq.getAttribute(Attributes.RID);
+        String idStr = req.getAttribute(Attributes.RID);
+        long prevID = Long.parseLong(prevIDStr);
+        long id = Long.parseLong(idStr);
+        if (!(prevReq.getPayloadXML().isEmpty()
+                && req.getPayloadXML().isEmpty())
+                && (id - prevID != 1)) {
+            // Not two consecutive empty requests
+            return;
+        }
+
+        ComposableBody prevResp =
+                toComposableBody(previous.getResponse().getBody());
+        if (!prevResp.getPayloadXML().isEmpty()) {
+            // Previous response was not empty
+            return;
+        }
+
+        CMSessionParams params = session.getCMSessionParams();
+        if (params == null) {
+            // Nothing to validate against
+            return;
+        }
+
+        AttrPolling polling = params.getPollingInterval();
+        if (polling == null) {
+            // Nothing to check against
+            return;
+        }
+
+        long prevTime = previous.getRequest().getRequestTime();
+        long connTime = conn.getRequest().getRequestTime();
+        long delta = connTime - prevTime;
+        if (delta < polling.getInMilliseconds() ) {
+            fail("Polling session overactivity policy violation in "
+                    + "connection #" + index + " (" + delta + " < "
+                    + polling.getInMilliseconds() + ")");
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Convert the abstract body supplied into a composable body instance
+     * as best we can.
+     *
+     * @param body body to convert
+     * @return composable body instance
+     */
+    private static ComposableBody toComposableBody(final AbstractBody body) {
+        if (body instanceof ComposableBody) {
+            return (ComposableBody) body;
+        }
+        try {
+            StaticBody sBody = StaticBody.fromString(body.toXML());
+            return ComposableBody.fromStaticBody(sBody);
+        } catch (BOSHException boshx) {
+            fail("Could not convert body to static body: " + body);
+        }
+        throw(new IllegalStateException("Shouldn't get here"));
     }
 
 }

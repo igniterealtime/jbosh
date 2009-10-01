@@ -118,10 +118,9 @@ public class XEP0124Section11Test extends AbstractBOSHTest {
                 .setAttribute(Attributes.REQUESTS, "2")
                 .build();
         conn.sendResponse(scr);
-        CMSessionParams params;
-        while ((params = session.getCMSessionParams()) == null) {
-            Thread.yield();
-        }
+        session.drain();
+        CMSessionParams params = session.getCMSessionParams();
+        assertNotNull(params);
 
         // Establish the max number of connections
         final ComposableBody resp = ComposableBody.builder()
