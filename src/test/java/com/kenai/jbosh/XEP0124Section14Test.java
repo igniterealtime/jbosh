@@ -16,7 +16,10 @@
 
 package com.kenai.jbosh;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Test;
+import static org.junit.Assert.*;
 
 /**
  * BOSH XEP-0124 specification section 14 tests:  Request IDs.
@@ -116,6 +119,128 @@ public class XEP0124Section14Test extends AbstractBOSHTest {
      * terminal binding error.
      */
     // BOSH CM functionality not supported.
-    // TODO: client handling of 'item-not-found' binding error
+
+    @Test(timeout=5000)
+    public void testItemNotFoundError() throws Exception {
+        logTestStart();
+
+        final AtomicBoolean connected = new AtomicBoolean();
+        final AtomicReference<Throwable> caught =
+                new AtomicReference<Throwable>();
+        session.addBOSHClientConnListener(new BOSHClientConnListener() {
+            public void connectionEvent(final BOSHClientConnEvent connEvent) {
+                connected.set(connEvent.isConnected());
+                caught.set(connEvent.getCause());
+            }
+        });
+
+        assertFalse(connected.get());
+        assertNull(caught.get());
+
+        // Initiate a new session
+        session.send(ComposableBody.builder().build());
+        StubConnection conn = cm.awaitConnection();
+        AbstractBody scr = ComposableBody.builder()
+                .setAttribute(Attributes.SID, "123XYZ")
+                .setAttribute(Attributes.WAIT, "1")
+                .setAttribute(Attributes.VER, "1.8")
+                .build();
+        conn.sendResponse(scr);
+        session.drain();
+
+        assertTrue(connected.get());
+        assertNull(caught.get());
+
+        // Send a request and have it return a policy violation
+        session.send(ComposableBody.builder()
+                .setAttribute(Attributes.SID, scr.getAttribute(Attributes.SID))
+                .build());
+        conn = cm.awaitConnection();
+        conn.sendResponse(ComposableBody.builder()
+                .setAttribute(Attributes.TYPE, "terminate")
+                .setAttribute(Attributes.CONDITION, "item-not-found")
+                .build());
+        session.drain();
+
+        assertFalse(connected.get());
+        assertNotNull(caught.get());
+        BOSHException boshx = (BOSHException) caught.get();
+        assertTrue(boshx.getMessage().contains(
+                TerminalBindingCondition.ITEM_NOT_FOUND.getMessage()));
+
+        // Attempts to send anything else should fail
+        try {
+            session.send(ComposableBody.builder().build());
+            conn = cm.awaitConnection();
+            conn.sendResponse(ComposableBody.builder()
+                    .setAttribute(Attributes.SID, "123XYZ")
+                    .build());
+            fail("Shouldn't be able to send after terminal binding error");
+        } catch (BOSHException ex) {
+            // Good
+        }
+        assertValidators(scr);
+    }
+
+    @Test(timeout=5000)
+    public void testDeprecatedItemNotFoundError() throws Exception {
+        logTestStart();
+
+        final AtomicBoolean connected = new AtomicBoolean();
+        final AtomicReference<Throwable> caught =
+                new AtomicReference<Throwable>();
+        session.addBOSHClientConnListener(new BOSHClientConnListener() {
+            public void connectionEvent(final BOSHClientConnEvent connEvent) {
+                connected.set(connEvent.isConnected());
+                caught.set(connEvent.getCause());
+            }
+        });
+
+        assertFalse(connected.get());
+        assertNull(caught.get());
+
+        // Initiate a new session
+        session.send(ComposableBody.builder().build());
+        StubConnection conn = cm.awaitConnection();
+        AbstractBody scr = ComposableBody.builder()
+                .setAttribute(Attributes.SID, "123XYZ")
+                .setAttribute(Attributes.WAIT, "1")
+                .build();
+        conn.sendResponse(scr);
+        session.drain();
+
+        assertTrue(connected.get());
+        assertNull(caught.get());
+
+        // Send a request and have it return a policy violation
+        session.send(ComposableBody.builder()
+                .setAttribute(Attributes.SID, scr.getAttribute(Attributes.SID))
+                .build());
+        conn = cm.awaitConnection();
+        conn.sendResponse(ComposableBody.builder()
+                .setAttribute(Attributes.TYPE, "terminate")
+                .setAttribute(Attributes.CONDITION, "item-not-found")
+                .build());
+        session.drain();
+
+        assertFalse(connected.get());
+        assertNotNull(caught.get());
+        BOSHException boshx = (BOSHException) caught.get();
+        assertTrue(boshx.getMessage().contains(
+                TerminalBindingCondition.ITEM_NOT_FOUND.getMessage()));
+
+        // Attempts to send anything else should fail
+        try {
+            session.send(ComposableBody.builder().build());
+            conn = cm.awaitConnection();
+            conn.sendResponse(ComposableBody.builder()
+                    .setAttribute(Attributes.SID, "123XYZ")
+                    .build());
+            fail("Shouldn't be able to send after terminal binding error");
+        } catch (BOSHException ex) {
+            // Good
+        }
+        assertValidators(scr);
+    }
 
 }

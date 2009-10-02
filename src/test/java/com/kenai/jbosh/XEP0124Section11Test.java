@@ -19,6 +19,7 @@ package com.kenai.jbosh;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Test;
 import static junit.framework.Assert.*;
 
@@ -159,6 +160,67 @@ public class XEP0124Section11Test extends AbstractBOSHTest {
      */
     // BOSH CM functionality not supported.
     // TODO: client response to reception of 'policy-violation' binding error
+    @Test(timeout=5000)
+    public void testPolicyViolationError() throws Exception {
+        logTestStart();
+
+        final AtomicBoolean connected = new AtomicBoolean();
+        final AtomicReference<Throwable> caught =
+                new AtomicReference<Throwable>();
+        session.addBOSHClientConnListener(new BOSHClientConnListener() {
+            public void connectionEvent(final BOSHClientConnEvent connEvent) {
+                connected.set(connEvent.isConnected());
+                caught.set(connEvent.getCause());
+            }
+        });
+
+        assertFalse(connected.get());
+        assertNull(caught.get());
+
+        // Initiate a new session
+        session.send(ComposableBody.builder().build());
+        StubConnection conn = cm.awaitConnection();
+        AbstractBody scr = ComposableBody.builder()
+                .setAttribute(Attributes.SID, "123XYZ")
+                .setAttribute(Attributes.WAIT, "1")
+                .setAttribute(Attributes.VER, "1.8")
+                .build();
+        conn.sendResponse(scr);
+        session.drain();
+
+        assertTrue(connected.get());
+        assertNull(caught.get());
+
+        // Send a request and have it return a policy violation
+        session.send(ComposableBody.builder()
+                .setAttribute(Attributes.SID, scr.getAttribute(Attributes.SID))
+                .build());
+        conn = cm.awaitConnection();
+        conn.sendResponse(ComposableBody.builder()
+                .setAttribute(Attributes.TYPE, "terminate")
+                .setAttribute(Attributes.CONDITION, "policy-violation")
+                .build());
+        session.drain();
+
+        assertFalse(connected.get());
+        assertNotNull(caught.get());
+        BOSHException boshx = (BOSHException) caught.get();
+        assertTrue(boshx.getMessage().contains(
+                TerminalBindingCondition.POLICY_VIOLATION.getMessage()));
+
+        // Attempts to send anything else should fail
+        try {
+            session.send(ComposableBody.builder().build());
+            conn = cm.awaitConnection();
+            conn.sendResponse(ComposableBody.builder()
+                    .setAttribute(Attributes.SID, "123XYZ")
+                    .build());
+            fail("Shouldn't be able to send after terminal binding error");
+        } catch (BOSHException ex) {
+            // Good
+        }
+        assertValidators(scr);
+    }
 
     /*
      * If the connection manager did not specify a 'requests' attribute in the
