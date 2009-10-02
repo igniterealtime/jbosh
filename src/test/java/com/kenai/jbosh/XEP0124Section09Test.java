@@ -35,16 +35,52 @@ public class XEP0124Section09Test extends AbstractBOSHTest {
      * 'rid' attribute (typically while it was holding the first request),
      * then it MAY acknowledge the reception to the client.
      */
-    // BOSH CM functionality not supported.
-    // TODO: Client handling of CM acks when both present and not present
 
     /*
      * The connection manager MAY set the 'ack' attribute of any response to
      * the value of the highest 'rid' attribute it has received in the case
      * where it has also received all requests with lower 'rid' values.
      */
+
     // BOSH CM functionality not supported.
-    // TODO: Client handling of CM acks
+
+    @Test(timeout=5000)
+    public void exerciseRequestAck() throws Exception {
+        logTestStart();
+        StubConnection conn;
+
+        // Session initialization
+        session.send(ComposableBody.builder().build());
+        conn = cm.awaitConnection();
+        StubRequest scReq = conn.getRequest();
+        String rid = scReq.getBody().getAttribute(Attributes.RID);
+        AbstractBody scr = ComposableBody.builder()
+                .setAttribute(Attributes.SID, "123XYZ")
+                .setAttribute(Attributes.WAIT, "1")
+                .setAttribute(Attributes.ACK, rid)
+                .build();
+        conn.sendResponse(scr);
+        session.drain();
+
+        // Now send two requests
+        session.send(ComposableBody.builder().build());
+        StubConnection conn1 = cm.awaitConnection();
+        session.send(ComposableBody.builder().build());
+        StubConnection conn2 = cm.awaitConnection();
+
+        // Now reply to the first, simulating CM request acks
+        AbstractBody req2 = conn1.getRequest().getBody();
+        conn1.sendResponse(ComposableBody.builder()
+                .setAttribute(Attributes.RID, scr.getAttribute(Attributes.RID))
+                .setAttribute(
+                    Attributes.ACK, req2.getAttribute(Attributes.RID))
+                .build());
+
+        // And finally, reply to the second request
+        conn2.sendResponse(ComposableBody.builder().build());
+
+        assertValidators(scr);
+    }
 
     /*
      * If the connection manager will be including 'ack' attributes on
