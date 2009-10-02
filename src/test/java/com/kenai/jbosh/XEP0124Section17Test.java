@@ -16,6 +16,8 @@
 
 package com.kenai.jbosh;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Test;
 import static junit.framework.Assert.*;
 
@@ -107,6 +109,20 @@ public class XEP0124Section17Test extends AbstractBOSHTest {
     @Test(timeout=5000)
     public void testTerminalBindingError() throws Exception {
         logTestStart();
+
+        final AtomicBoolean connected = new AtomicBoolean();
+        final AtomicReference<Throwable> caught =
+                new AtomicReference<Throwable>();
+        session.addBOSHClientConnListener(new BOSHClientConnListener() {
+            public void connectionEvent(final BOSHClientConnEvent connEvent) {
+                connected.set(connEvent.isConnected());
+                caught.set(connEvent.getCause());
+            }
+        });
+
+        assertFalse(connected.get());
+        assertNull(caught.get());
+
         // Initiate a new session
         session.send(ComposableBody.builder().build());
         StubConnection conn = cm.awaitConnection();
@@ -118,8 +134,14 @@ public class XEP0124Section17Test extends AbstractBOSHTest {
                 .setAttribute(Attributes.CONDITION, "bad-request")
                 .build();
         conn.sendResponse(scr);
+        session.drain();
 
-        // TODO: should receive close event
+        assertFalse(connected.get());
+        assertNotNull(caught.get());
+        BOSHException boshx = (BOSHException) caught.get();
+        assertTrue(boshx.getMessage().contains(
+                TerminalBindingCondition.BAD_REQUEST.getMessage()));
+
         // Attempts to send anything else should fail
         try {
             session.send(ComposableBody.builder().build());
@@ -128,7 +150,7 @@ public class XEP0124Section17Test extends AbstractBOSHTest {
                     .setAttribute(Attributes.SID, "123XYZ")
                     .build());
             fail("Shouldn't be able to send after terminal binding error");
-        } catch (BOSHException boshx) {
+        } catch (BOSHException ex) {
             // Good
         }
         assertValidators(scr);

@@ -30,7 +30,7 @@ public class XEP0124Section04Test extends AbstractBOSHTest {
      */
     @Test
     public void concurrentConnections() {
-        // TODO: Test for number of concurrent HTTP connections?
+        testedBy(ConnectionValidator.class, "validateConnectionCount");
     }
 
 }
