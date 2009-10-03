@@ -66,7 +66,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/ma
         <dependency>
             <groupId>org.xlightweb</groupId>
             <artifactId>xlightweb</artifactId>
-            <version>2.7.3</version>
+            <version>2.5</version>
             <exclusions>
                 <exclusion>
                     <groupId>org.jboss.resteasy</groupId>
