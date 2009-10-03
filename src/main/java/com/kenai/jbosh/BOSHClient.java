@@ -125,7 +125,7 @@ public final class BOSHClient {
     /**
      * Message used whena null listener is detected.
      */
-    private static final String NULL_LISTENER = "Listener may not b enull";
+    private static final String NULL_LISTENER = "Listener may not be null";
 
     /**
      * Default empty request delay.
