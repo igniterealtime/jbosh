@@ -16,6 +16,8 @@
 
 package com.kenai.jbosh;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * Data type representing the getValue of the {@code pause} attribute of the
  * {@code bosh} element.
@@ -56,7 +58,8 @@ final class AttrPause extends AbstractIntegerAttr {
      * @return pause tme in milliseconds
      */
     public int getInMilliseconds() {
-        return intValue() * 1000;
+        return (int) TimeUnit.MILLISECONDS.convert(
+                intValue(), TimeUnit.SECONDS);
     }
 
 }

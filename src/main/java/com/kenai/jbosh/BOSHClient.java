@@ -118,6 +118,16 @@ public final class BOSHClient {
     private static final String INTERRUPTED = "Interrupted";
 
     /**
+     * Message used for unhandled exceptions.
+     */
+    private static final String UNHANDLED = "Unhandled Exception";
+
+    /**
+     * Message used whena null listener is detected.
+     */
+    private static final String NULL_LISTENER = "Listener may not b enull";
+
+    /**
      * Default empty request delay.
      */
     private static final int DEFAULT_EMPTY_REQUEST_DELAY = 100;
@@ -375,8 +385,7 @@ public final class BOSHClient {
     public void addBOSHClientConnListener(
             final BOSHClientConnListener listener) {
         if (listener == null) {
-            throw(new IllegalArgumentException(
-                    "Listener may not be null"));
+            throw(new IllegalArgumentException(NULL_LISTENER));
         }
         connListeners.add(listener);
     }
@@ -389,8 +398,7 @@ public final class BOSHClient {
     public void removeBOSHClientConnListener(
             final BOSHClientConnListener listener) {
         if (listener == null) {
-            throw(new IllegalArgumentException(
-                    "Listener may not be null"));
+            throw(new IllegalArgumentException(NULL_LISTENER));
         }
         connListeners.remove(listener);
     }
@@ -403,8 +411,7 @@ public final class BOSHClient {
     public void addBOSHClientRequestListener(
             final BOSHClientRequestListener listener) {
         if (listener == null) {
-            throw(new IllegalArgumentException(
-                    "Listener may not be null"));
+            throw(new IllegalArgumentException(NULL_LISTENER));
         }
         requestListeners.add(listener);
     }
@@ -418,8 +425,7 @@ public final class BOSHClient {
     public void removeBOSHClientRequestListener(
             final BOSHClientRequestListener listener) {
         if (listener == null) {
-            throw(new IllegalArgumentException(
-                    "Listener may not be null"));
+            throw(new IllegalArgumentException(NULL_LISTENER));
         }
         requestListeners.remove(listener);
     }
@@ -432,8 +438,7 @@ public final class BOSHClient {
     public void addBOSHClientResponseListener(
             final BOSHClientResponseListener listener) {
         if (listener == null) {
-            throw(new IllegalArgumentException(
-                    "Listener may not be null"));
+            throw(new IllegalArgumentException(NULL_LISTENER));
         }
         responseListeners.add(listener);
     }
@@ -447,8 +452,7 @@ public final class BOSHClient {
     public void removeBOSHClientResponseListener(
             final BOSHClientResponseListener listener) {
         if (listener == null) {
-            throw(new IllegalArgumentException(
-                    "Listener may not be null"));
+            throw(new IllegalArgumentException(NULL_LISTENER));
         }
         responseListeners.remove(listener);
     }
@@ -1426,8 +1430,8 @@ public final class BOSHClient {
             }
             try {
                 listener.requestSent(event);
-            } catch (Throwable thr) {
-                LOG.log(Level.WARNING, "Unhandled Throwable", thr);
+            } catch (Exception ex) {
+                LOG.log(Level.WARNING, UNHANDLED, ex);
             }
         }
     }
@@ -1449,8 +1453,8 @@ public final class BOSHClient {
             }
             try {
                 listener.responseReceived(event);
-            } catch (Throwable thr) {
-                LOG.log(Level.WARNING, "Unhandled Throwable", thr);
+            } catch (Exception ex) {
+                LOG.log(Level.WARNING, UNHANDLED, ex);
             }
         }
     }
@@ -1473,8 +1477,8 @@ public final class BOSHClient {
                 }
                 try {
                     listener.connectionEvent(event);
-                } catch (Throwable thr) {
-                    LOG.log(Level.WARNING, "Unhandled Throwable", thr);
+                } catch (Exception ex) {
+                    LOG.log(Level.WARNING, UNHANDLED, ex);
                 }
             }
         } finally {
@@ -1498,8 +1502,8 @@ public final class BOSHClient {
             }
             try {
                 listener.connectionEvent(event);
-            } catch (Throwable thr) {
-                LOG.log(Level.WARNING, "Unhandled Throwable", thr);
+            } catch (Exception ex) {
+                LOG.log(Level.WARNING, UNHANDLED, ex);
             }
         }
     }
@@ -1523,8 +1527,8 @@ public final class BOSHClient {
             }
             try {
                 listener.connectionEvent(event);
-            } catch (Throwable thr) {
-                LOG.log(Level.WARNING, "Unhandled Throwable", thr);
+            } catch (Exception ex) {
+                LOG.log(Level.WARNING, UNHANDLED, ex);
             }
         }
     }
