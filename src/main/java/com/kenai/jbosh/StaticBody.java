@@ -36,7 +36,7 @@ import java.util.Map;
  * <p/>
  * Instances of this class are immutable and thread-safe.
  */
-public final class StaticBody extends AbstractBody {
+final class StaticBody extends AbstractBody {
 
     /**
      * Selected parser to be used to process raw XML messages.
