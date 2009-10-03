@@ -17,10 +17,10 @@
 package com.kenai.jbosh;
 
 /**
- * Data type representing the getValue of the {@code maxpause} attribute of the
+ * Data type representing the getValue of the {@code pause} attribute of the
  * {@code bosh} element.
  */
-final class AttrMaxPause extends AbstractIntegerAttr {
+final class AttrPause extends AbstractIntegerAttr {
     
     /**
      * Creates a new attribute object.
@@ -28,7 +28,7 @@ final class AttrMaxPause extends AbstractIntegerAttr {
      * @param val attribute getValue
      * @throws BOSHException on parse or validation failure
      */
-    private AttrMaxPause(final String val) throws BOSHException {
+    private AttrPause(final String val) throws BOSHException {
         super(val);
         checkMinValue(1);
     }
@@ -41,17 +41,17 @@ final class AttrMaxPause extends AbstractIntegerAttr {
      *  {@code null}
      * @throws BOSHException on parse or validation failure
      */
-    static AttrMaxPause createFromString(final String str)
+    static AttrPause createFromString(final String str)
     throws BOSHException {
         if (str == null) {
             return null;
         } else {
-            return new AttrMaxPause(str);
+            return new AttrPause(str);
         }
     }
     
     /**
-     * Get the max pause time in milliseconds.
+     * Get the pause time in milliseconds.
      *
      * @return pause tme in milliseconds
      */

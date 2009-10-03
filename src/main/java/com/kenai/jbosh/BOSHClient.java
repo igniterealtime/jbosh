@@ -131,6 +131,21 @@ public final class BOSHClient {
             DEFAULT_EMPTY_REQUEST_DELAY);
 
     /**
+     * Default value for the pause margin.
+     */
+    private static final int DEFAULT_PAUSE_MARGIN = 500;
+
+    /**
+     * The amount of time in milliseconds which will be reserved as a
+     * safety margin when scheduling empty requests against a maxpause
+     * value.   This should give us enough time to build the message
+     * and transport it to the remote host.
+     */
+    private static final int PAUSE_MARGIN = Integer.getInteger(
+            BOSHClient.class.getName() + ".pauseMargin",
+            DEFAULT_PAUSE_MARGIN);
+    
+    /**
      * Flag indicating whether or not we want to perform assertions.
      */
     private static final boolean ASSERTIONS;
@@ -455,6 +470,7 @@ public final class BOSHClient {
      * @throws BOSHException on message transmission failure
      */
     public void send(final ComposableBody body) throws BOSHException {
+        assertUnlocked();
         if (body == null) {
             throw(new IllegalArgumentException(
                     "Message body may not be null"));
@@ -493,6 +509,50 @@ public final class BOSHClient {
         HTTPResponse resp = httpSender.send(params, finalReq);
         exch.setHTTPResponse(resp);
         fireRequestSent(finalReq);
+    }
+
+    /**
+     * Attempt to pause the current session.  When supported by the remote
+     * connection manager, pausing the session will result in the connection
+     * manager closing out all outstanding requests (including the pause
+     * request) and increases the inactivity timeout of the session.  The
+     * exact value of the temporary timeout is dependent upon the connection
+     * manager.  This method should be used if a client encounters an
+     * exceptional temporary situation during which it will be unable to send
+     * requests to the connection manager for a period of time greater than
+     * the maximum inactivity period.
+     *
+     * The session will revert back to it's normal, unpaused state when the
+     * client sends it's next message.
+     *
+     * @return {@code true} if the connection manager supports session pausing,
+     *  {@code false} if the connection manager does not support session
+     *  pausing or if the session has not yet been established
+     */
+    public boolean pause() {
+        assertUnlocked();
+        lock.lock();
+        AttrMaxPause maxPause = null;
+        try {
+            if (cmParams == null) {
+                return false;
+            }
+
+            maxPause = cmParams.getMaxPause();
+            if (maxPause == null) {
+                return false;
+            }
+        } finally {
+            lock.unlock();
+        }
+        try {
+            send(ComposableBody.builder()
+                    .setAttribute(Attributes.PAUSE, maxPause.toString())
+                    .build());
+        } catch (BOSHException boshx) {
+            LOG.log(Level.FINEST, "Could not send pause", boshx);
+        }
+        return true;
     }
 
     /**
@@ -981,12 +1041,13 @@ public final class BOSHClient {
         AbstractBody req = exch.getRequest();
         CMSessionParams params;
         List<HTTPExchange> toResend = null;
-        boolean noOutstanding;
         lock.lock();
         try {
             // Check for session creation response info, if needed
             if (cmParams == null) {
                 cmParams = CMSessionParams.fromSessionInit(req, body);
+
+                // The following call handles the lock. It's not an escape.
                 fireConnectionEstablished();
             }
             params = cmParams;
@@ -1033,9 +1094,8 @@ public final class BOSHClient {
             if (lock.isHeldByCurrentThread()) {
                 try {
                     exchanges.remove(exch);
-                    noOutstanding = exchanges.isEmpty();
-                    if (noOutstanding) {
-                        scheduleEmptyRequest();
+                    if (exchanges.isEmpty()) {
+                        scheduleEmptyRequest(processPauseRequest(req));
                     }
                     notFull.signalAll();
                 } finally {
@@ -1067,14 +1127,14 @@ public final class BOSHClient {
     }
 
     /**
-     * Schedule an empty request to be sent if no other requests are
-     * sent in a reasonable amount of time.
+     * Calculates the default empty request delay/interval to use for the
+     * active session.
+     *
+     * @return delay in milliseconds
      */
-    private void scheduleEmptyRequest() {
+    private long getDefaultEmptyRequestDelay() {
         assertLocked();
-
-        clearEmptyRequest();
-
+        
         // Figure out how long we should wait before sending an empty request
         AttrPolling polling = cmParams.getPollingInterval();
         long delay;
@@ -1083,8 +1143,29 @@ public final class BOSHClient {
         } else {
             delay = polling.getInMilliseconds();
         }
+        return delay;
+    }
 
+    /**
+     * Schedule an empty request to be sent if no other requests are
+     * sent in a reasonable amount of time.
+     */
+    private void scheduleEmptyRequest(long delay) {
+        assertLocked();
+        if (delay < 0L) {
+            throw(new IllegalArgumentException(
+                    "Empty request delay must be >= 0 (was: " + delay + ")"));
+        }
+
+        clearEmptyRequest();
+        if (!isWorking()) {
+            return;
+        }
+        
         // Schedule the transmission
+        if (LOG.isLoggable(Level.FINER)) {
+            LOG.finer("Scheduling empty request in " + delay + "ms");
+        }
         try {
             emptyRequestFuture = schedExec.schedule(emptyRequestRunnable,
                     delay, TimeUnit.MILLISECONDS);
@@ -1100,6 +1181,7 @@ public final class BOSHClient {
      * will be cancelled.
      */
     private void sendEmptyRequest() {
+        assertUnlocked();
         // Send an empty request
         LOG.finest("Sending empty request");
         try {
@@ -1165,6 +1247,38 @@ public final class BOSHClient {
     private static boolean isRecoverableBindingCondition(
             final AbstractBody resp) {
         return ERROR.equals(resp.getAttribute(Attributes.TYPE));
+    }
+
+    /**
+     * Process the request to determine if the empty request delay
+     * can be determined by looking to see if the request is a pause
+     * request.  If it can, the request's delay is returned, otherwise
+     * the default delay is returned.
+     * 
+     * @return delay in milliseconds that should elapse prior to an
+     *  empty message being sent
+     */
+    private long processPauseRequest(
+            final AbstractBody req) {
+        assertLocked();
+
+        if (cmParams != null && cmParams.getMaxPause() != null) {
+            try {
+                AttrPause pause = AttrPause.createFromString(
+                        req.getAttribute(Attributes.PAUSE));
+                if (pause != null) {
+                    long delay = pause.getInMilliseconds() - PAUSE_MARGIN;
+                    if (delay < 0) {
+                        delay = EMPTY_REQUEST_DELAY;
+                    }
+                    return delay;
+                }
+            } catch (BOSHException boshx) {
+                LOG.log(Level.FINEST, "Could not extract", boshx);
+            }
+        }
+
+        return getDefaultEmptyRequestDelay();
     }
 
     /**

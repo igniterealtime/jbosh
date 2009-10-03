@@ -46,7 +46,7 @@ import static org.junit.Assert.*;
 
 /**
  * BOSHClientRequestListener which validates the form and content of the
- * all requests made to the CM.
+ * all requests made to the CM by the BOSHClient session.
  */
 public class RequestValidator implements BOSHClientRequestListener {
 
@@ -60,7 +60,7 @@ public class RequestValidator implements BOSHClientRequestListener {
     private final AtomicReference<AbstractBody> sessionCreationResponse =
             new AtomicReference<AbstractBody>();
 
-    private List<AbstractBody> requests = null;
+    private List<Node> requests = null;
 
     static {
         try {
@@ -80,13 +80,51 @@ public class RequestValidator implements BOSHClientRequestListener {
     }
 
     /**
+     * Class used to associate timing info with sent messages.
+     */
+    private static class Node {
+        private final long timestamp;
+        private final AbstractBody body;
+
+        /**
+         * Constructor.
+         *
+         * @param stamp time in millis when the msg was sent
+         * @param msg the sent msg
+         */
+        public Node(final long stamp, final AbstractBody msg) {
+            timestamp = stamp;
+            body = msg;
+        }
+
+        /**
+         * Get the time the msg was sent.
+         *
+         * @return time in millis
+         */
+        public long getTime() {
+            return timestamp;
+        }
+
+        /**
+         * Get the msg that was sent.
+         *
+         * @return msg
+         */
+        public AbstractBody getBody() {
+            return body;
+        }
+    }
+
+    /**
      * {@inheritDoc}
      */
     public void requestSent(final BOSHMessageEvent event) {
         if (requests == null) {
-            requests = new CopyOnWriteArrayList<AbstractBody>();
+            requests = new CopyOnWriteArrayList<Node>();
         }
-        requests.add(event.getBody());
+        Node node = new Node(System.currentTimeMillis(), event.getBody());
+        requests.add(node);
     }
 
     /**
@@ -122,17 +160,18 @@ public class RequestValidator implements BOSHClientRequestListener {
         }
         sessionCreationResponse.set(scr);
         LOG.fine("Validating " + requests.size() + " message(s)"); 
-        AbstractBody previous = null;
-        AbstractBody first = null;
+        Node previous = null;
+        Node first = null;
         int index = 0;
-        for (AbstractBody body : requests) {
+        for (Node node : requests) {
             if (first == null) {
-                first = body;
+                first = node;
             }
-            String rid = body.getAttribute(Attributes.RID);
+
+            String rid = node.getBody().getAttribute(Attributes.RID);
             LOG.fine("Validating msg #" + index + " (RID: " + rid + ")");
-            validateRequest(index, first, previous, body);
-            previous = body;
+            validateRequest(index, first, previous, node);
+            previous = node;
             index++;
         }
     }
@@ -148,9 +187,9 @@ public class RequestValidator implements BOSHClientRequestListener {
      */
     private void validateRequest(
             final int idx,
-            final AbstractBody first,
-            final AbstractBody previous,
-            final AbstractBody request) {
+            final Node first,
+            final Node previous,
+            final Node request) {
         try {
             assertValidXML(request);
             assertSingleBodyElement(request);
@@ -168,11 +207,11 @@ public class RequestValidator implements BOSHClientRequestListener {
                 validateRequestHeaders(idx, request, previous);
                 validateSubsequentRequestSID(idx, request);
                 validateSubsequestRequestAck(idx, first, request);
-                validateSubsequentPause(idx, request);
+                validateSubsequentPause(idx, request, previous);
             }
         } catch (AssertionError err) {
             LOG.info("Assertion failed for request #" + idx + ": "
-                    + err.getMessage() + "\n" + request.toXML());
+                    + err.getMessage() + "\n" + request.getBody().toXML());
             throw(err);
         }
     }
@@ -187,11 +226,11 @@ public class RequestValidator implements BOSHClientRequestListener {
      *
      * @param body message to validate
      */
-    private void assertSingleBodyElement(final AbstractBody body) {
+    private void assertSingleBodyElement(final Node node) {
         NodeList nSet;
-        nSet = (NodeList) bodyXPath(body, "/bosh:body", XPathConstants.NODESET);
+        nSet = (NodeList) bodyXPath(node, "/bosh:body", XPathConstants.NODESET);
         assertEquals("BOSH body count", 1, nSet.getLength());
-        nSet = (NodeList) bodyXPath(body, "/*", XPathConstants.NODESET);
+        nSet = (NodeList) bodyXPath(node, "/*", XPathConstants.NODESET);
         assertEquals("Body count", 1, nSet.getLength());
     }
 
@@ -211,9 +250,9 @@ public class RequestValidator implements BOSHClientRequestListener {
      *
      * @param request request to validate
      */
-    private void assertValidXML(final AbstractBody request) {
+    private void assertValidXML(final Node request) {
         ByteArrayInputStream stream = new ByteArrayInputStream(
-                request.toXML().getBytes());
+                request.getBody().toXML().getBytes());
         StreamSource source = new StreamSource(stream);
         Throwable thr;
         try {
@@ -232,39 +271,43 @@ public class RequestValidator implements BOSHClientRequestListener {
     /**
      * The content MUST NOT contain XML comments.
      *
-     * @param body message to validate
+     * @param node message to validate
      */
-    private void assertNoComments(final AbstractBody body) {
+    private void assertNoComments(final Node node) {
         NodeList nSet;
         nSet = (NodeList) bodyXPath(
-                body, "//comment()", XPathConstants.NODESET);
+                node, "//comment()", XPathConstants.NODESET);
         assertEquals("XML comment count", 0, nSet.getLength());
     }
 
     /**
      * The content MUST NOT contain XML processing instructions.
      *
-     * @param body message to validate
+     * @param node message to validate
      */
-    private void assertNoProcessingInstructions(final AbstractBody body) {
+    private void assertNoProcessingInstructions(final Node node) {
         NodeList nSet;
         nSet = (NodeList) bodyXPath(
-                body, "//processing-instruction()", XPathConstants.NODESET);
+                node, "//processing-instruction()",
+                XPathConstants.NODESET);
         assertEquals("Processing instruction count", 0, nSet.getLength());
     }
 
     /**
      * The <body/> element of every client request MUST possess a sequential
      * request ID encapsulated via the 'rid' attribute.
+     *
+     * @param node node to validate
+     * @param previous previous node
      */
     private void assertRequestIDSequential(
-            final AbstractBody body, final AbstractBody previous) {
-        String ridStr = body.getAttribute(Attributes.RID);
+            final Node node, final Node previous) {
+        String ridStr = node.getBody().getAttribute(Attributes.RID);
         assertNotNull("Request ID attribute not present", ridStr);
 
         long rid = Long.parseLong(ridStr);
         if (previous != null) {
-            String prevRidStr = previous.getAttribute(Attributes.RID);
+            String prevRidStr = previous.getBody().getAttribute(Attributes.RID);
             assertNotNull("Previous request ID attribute not present",
                     prevRidStr);
             long prevRid = Long.parseLong(prevRidStr);
@@ -287,32 +330,33 @@ public class RequestValidator implements BOSHClientRequestListener {
      */
     private void validateRequestHeaders(
             final int idx,
-            final AbstractBody request,
-            final AbstractBody previous) {
+            final Node request,
+            final Node previous) {
+        AbstractBody body = request.getBody();
         if (previous == null) {
             // session creation request
             assertNotNull("to attribute not present in request #" + idx,
-                    request.getAttribute(Attributes.TO));
+                    body.getAttribute(Attributes.TO));
             assertNotNull("xml:lang attribute not present in request #" + idx,
-                    request.getAttribute(Attributes.XML_LANG));
+                    body.getAttribute(Attributes.XML_LANG));
             assertNotNull("ver attribute not present in request #" + idx,
-                    request.getAttribute(Attributes.VER));
+                    body.getAttribute(Attributes.VER));
             assertNotNull("wait attribute not present in request #" + idx,
-                    request.getAttribute(Attributes.WAIT));
+                    body.getAttribute(Attributes.WAIT));
             assertNotNull("hold attribute not present in request #" + idx,
-                    request.getAttribute(Attributes.HOLD));
+                    body.getAttribute(Attributes.HOLD));
         } else {
             // subsequent request
             assertNull("to attribute was present in request #" + idx,
-                    request.getAttribute(Attributes.TO));
+                    body.getAttribute(Attributes.TO));
             assertNull("xml:lang attribute was present in request #" + idx,
-                    request.getAttribute(Attributes.XML_LANG));
+                    body.getAttribute(Attributes.XML_LANG));
             assertNull("ver attribute was present in request #" + idx,
-                    request.getAttribute(Attributes.VER));
+                    body.getAttribute(Attributes.VER));
             assertNull("wait attribute was present in request #" + idx,
-                    request.getAttribute(Attributes.WAIT));
+                    body.getAttribute(Attributes.WAIT));
             assertNull("hold attribute was present in request #" + idx,
-                    request.getAttribute(Attributes.HOLD));
+                    body.getAttribute(Attributes.HOLD));
         }
     }
 
@@ -325,9 +369,9 @@ public class RequestValidator implements BOSHClientRequestListener {
      */
     private void validateSessionCreationSID(
             final int idx,
-            final AbstractBody request) {
+            final Node request) {
         assertNull("sid attribute was present in request #" + idx,
-                request.getAttribute(Attributes.SID));
+                request.getBody().getAttribute(Attributes.SID));
     }
 
     /**
@@ -343,8 +387,8 @@ public class RequestValidator implements BOSHClientRequestListener {
      */
     private void validateSessionCreationAck(
             final int idx,
-            final AbstractBody request) {
-        String ack = request.getAttribute(Attributes.ACK);
+            final Node request) {
+        String ack = request.getBody().getAttribute(Attributes.ACK);
         if (ack != null) {
             assertEquals("intial ack must be 1", "1", ack);
         }
@@ -359,8 +403,8 @@ public class RequestValidator implements BOSHClientRequestListener {
      */
     private void validateSessionCreationHold(
             final int idx,
-            final AbstractBody request) {
-        String hold = request.getAttribute(Attributes.HOLD);
+            final Node request) {
+        String hold = request.getBody().getAttribute(Attributes.HOLD);
         assertNotNull("hold attribute was not present in initial request",
                 hold);
         assertEquals("incorrect hold attrivute value", "1", hold);
@@ -377,9 +421,9 @@ public class RequestValidator implements BOSHClientRequestListener {
      */
     private void validateSubsequentRequestSID(
             final int idx,
-            final AbstractBody request) {
+            final Node request) {
         assertNotNull("sid attribute not present in request #" + idx,
-                request.getAttribute(Attributes.SID));
+                request.getBody().getAttribute(Attributes.SID));
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -400,15 +444,15 @@ public class RequestValidator implements BOSHClientRequestListener {
      */
     private void validateSubsequestRequestAck(
             final int idx,
-            final AbstractBody first,
-            final AbstractBody request) {
+            final Node first,
+            final Node request) {
         if (request == first) {
             // Nothing to check on first request
             return;
         }
-        String ack = first.getAttribute(Attributes.ACK);
+        String ack = first.getBody().getAttribute(Attributes.ACK);
         if (ack == null) {
-            String subAck = request.getAttribute(Attributes.ACK);
+            String subAck = request.getBody().getAttribute(Attributes.ACK);
             assertNull("subsequent request #" + idx + " can only use acks if "
                     + "advertized in session creation request", subAck);
         }
@@ -427,18 +471,39 @@ public class RequestValidator implements BOSHClientRequestListener {
      */
     private void validateSubsequentPause(
             final int idx,
-            final AbstractBody request) {
+            final Node request,
+            final Node previous) {
         AbstractBody scr = sessionCreationResponse.get();
         if (scr == null) {
             // Not checking this
             return;
         }
 
-        String pause = request.getAttribute(Attributes.PAUSE);
-        if (pause != null) {
-            String maxPause = scr.getAttribute(Attributes.MAXPAUSE);
-            assertNotNull("Request #" + idx + " can only use pause when "
-                    + "advertized in session creation response", maxPause);
+        try {
+            // Check the current node:
+            AttrPause pause = AttrPause.createFromString(
+                    request.getBody().getAttribute(Attributes.PAUSE));
+            if (pause != null) {
+                AttrMaxPause maxPause = AttrMaxPause.createFromString(
+                        scr.getAttribute(Attributes.MAXPAUSE));
+                assertNotNull("Request #" + idx + " can only use pause when "
+                        + "advertized in session creation response", maxPause);
+                assertTrue(pause.intValue() < maxPause.intValue());
+            }
+
+            // Check the previous node
+            AttrPause prevPause = AttrPause.createFromString(
+                    previous.getBody().getAttribute(Attributes.PAUSE));
+            if (prevPause != null) {
+                long delta = request.getTime() - previous.getTime();
+                if (delta > prevPause.getInMilliseconds()) {
+                    fail("Request #" + idx + " was sent too late relative to "
+                        + "the previous pause message (delta=" + delta
+                        + ", pause=" + prevPause.getInMilliseconds() + ")");
+                }
+            }
+        } catch (BOSHException boshx) {
+            fail("Could not parse pause/maxpause: " + boshx.getMessage());
         }
     }
 
@@ -450,10 +515,12 @@ public class RequestValidator implements BOSHClientRequestListener {
      * The client MUST generate a large, random, positive integer for the
      * initial 'rid' (see Security Considerations) and then increment that
      * value by one for each subsequent request.
+     *
+     * @param node node to validate
      */
     private void assertSessionCreationRequestID(
-            final AbstractBody body) {
-        String ridStr = body.getAttribute(Attributes.RID);
+            final Node node) {
+        String ridStr = node.getBody().getAttribute(Attributes.RID);
         assertNotNull("Request ID attribute not present", ridStr);
 
         long rid = Long.parseLong(ridStr);
@@ -465,10 +532,12 @@ public class RequestValidator implements BOSHClientRequestListener {
     /*
      * The client MUST take care to choose an initial 'rid' that will never be
      * incremented above 9007199254740991 [21] within the session.
+     *
+     * @param node node to validate
      */
     private void assertSessionCreationRequestIDRange(
-            final AbstractBody body) {
-        String ridStr = body.getAttribute(Attributes.RID);
+            final Node node) {
+        String ridStr = node.getBody().getAttribute(Attributes.RID);
         long rid = Long.parseLong(ridStr);
         BigInteger biRID = BigInteger.valueOf(rid);
         BigInteger biMax = new BigInteger("9007199254740991");
@@ -485,13 +554,18 @@ public class RequestValidator implements BOSHClientRequestListener {
     
     /**
      * Execute an XPath against a AbstractBody instance.
+     *
+     * @param body node with body to XPath against
+     * @param xpath the XPath expression
+     * @param returnType type to return
+     * @return resulting node
      */
     private Object bodyXPath(
-            final AbstractBody body,
+            final Node node,
             final String xpath,
             final QName returnType) {
         try {
-            String xml = body.toXML();
+            String xml = node.getBody().toXML();
             ByteArrayInputStream stream =
                     new ByteArrayInputStream(xml.getBytes());
             DocumentBuilderFactory factory =
