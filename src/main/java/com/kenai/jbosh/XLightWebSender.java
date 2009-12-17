@@ -57,7 +57,8 @@ final class XLightWebSender implements HTTPSender {
      * Prevent construction apart from our package.
      */
     XLightWebSender() {
-        // Empty
+        // Load a xLightweb class
+        HttpClient.class.getName();
     }
 
     ///////////////////////////////////////////////////////////////////////////

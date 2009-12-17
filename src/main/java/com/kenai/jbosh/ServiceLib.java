@@ -106,6 +106,11 @@ final class ServiceLib {
 
         ClassLoader loader = ServiceLib.class.getClassLoader();
         URL url = loader.getResource("META-INF/services/" + ofClass.getName());
+        if (url == null) {
+            // Early-out
+            return result;
+        }
+
         InputStream inStream = null;
         InputStreamReader reader = null;
         BufferedReader bReader = null;
@@ -148,7 +153,7 @@ final class ServiceLib {
             LOG.finest("Attempting service load: " + className);
         }
         Level level;
-        Exception thrown;
+        Throwable thrown;
         try {
             Class clazz = Class.forName(className);
             if (!ofClass.isAssignableFrom(clazz)) {
@@ -159,6 +164,9 @@ final class ServiceLib {
                 return null;
             }
             return ofClass.cast(clazz.newInstance());
+        } catch (LinkageError ex) {
+            level = Level.FINEST;
+            thrown = ex;
         } catch (ClassNotFoundException ex) {
             level = Level.FINEST;
             thrown = ex;
