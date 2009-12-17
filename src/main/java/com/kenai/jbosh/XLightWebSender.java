@@ -72,6 +72,12 @@ final class XLightWebSender implements HTTPSender {
         try {
             cfg = session;
             client = new HttpClient();
+            if (cfg != null &&
+                    cfg.getProxyHost() != null &&
+                    cfg.getProxyPort() != 0) {
+                client.setProxyHost(cfg.getProxyHost());
+                client.setProxyPort(cfg.getProxyPort());
+            }
         } finally {
             lock.unlock();
         }
