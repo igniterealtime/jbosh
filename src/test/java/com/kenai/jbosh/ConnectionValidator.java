@@ -52,7 +52,7 @@ public final class ConnectionValidator implements StubCMListener {
     // Classes:
 
     private class InactivityChecker implements Runnable {
-        private int max;
+        private final int max;
 
         private InactivityChecker(final int maxSecs) {
             max = maxSecs;
@@ -75,11 +75,7 @@ public final class ConnectionValidator implements StubCMListener {
      * {@inheritDoc}
      */
     public void requestReceived(final StubConnection conn) {
-        // Disregard any pending inactivity checks
-        ScheduledFuture checker = inactivityRef.getAndSet(null);
-        if (checker != null) {
-            checker.cancel(true);
-        }
+        cancelInactivityCheck();
 
         conns.add(conn);
         int count = openConnections.incrementAndGet();
@@ -113,12 +109,8 @@ public final class ConnectionValidator implements StubCMListener {
      * according to specification.
      */
     public void checkAssertions() {
-        // Disregard any pending checks - we're shutting down
-        ScheduledFuture checker = inactivityRef.getAndSet(null);
-        if (checker != null) {
-            checker.cancel(true);
-        }
-
+        done();
+        
         Error err = toThrow.get();
         if (err != null) {
             throw(err);
@@ -144,6 +136,13 @@ public final class ConnectionValidator implements StubCMListener {
 
     ///////////////////////////////////////////////////////////////////////////
     // Package methods:
+
+    /**
+     * Mark the end of the tests.
+     */
+    void done() {
+        cancelInactivityCheck();
+    }
 
     /**
      * Set the BOSH session that this validator is monitoring.
@@ -307,11 +306,23 @@ public final class ConnectionValidator implements StubCMListener {
             } else {
                 max = inactivity.intValue();
             }
-            schedExec.schedule(
-                    new InactivityChecker(max), max, TimeUnit.SECONDS);
-
+            LOG.finest("Scheduling inactivity timer");
+            inactivityRef.set(schedExec.schedule(
+                    new InactivityChecker(max), max, TimeUnit.SECONDS));
         } catch (Error err) {
             toThrow.compareAndSet(null, err);
+        }
+    }
+
+    /**
+     * Cancel any outstanding activity timer check.
+     */
+    private void cancelInactivityCheck() {
+        // Disregard any pending checks - we're shutting down
+        ScheduledFuture checker = inactivityRef.getAndSet(null);
+        if (checker != null) {
+            LOG.finest("Inactivity timer canceled");
+            checker.cancel(true);
         }
     }
 
