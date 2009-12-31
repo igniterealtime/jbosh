@@ -1351,8 +1351,9 @@ public final class BOSHClient {
         } else {
             pendingResponseAcks.add(rid);
             // Remove up until the first missing response (or end of queue)
-            Long whileVal = responseAck;
-            while (whileVal.equals(pendingResponseAcks.first())) {
+            Long whileVal = Long.valueOf(responseAck.longValue() + 1);
+            while (!pendingResponseAcks.isEmpty()
+                    && whileVal.equals(pendingResponseAcks.first())) {
                 responseAck = whileVal;
                 pendingResponseAcks.remove(whileVal);
                 whileVal = Long.valueOf(whileVal.longValue() + 1);

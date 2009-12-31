@@ -78,6 +78,7 @@ public abstract class AbstractBOSHTest {
             }
         });
         result.addBOSHClientRequestListener(reqValidator);
+        result.addBOSHClientResponseListener(reqValidator);
         result.addBOSHClientResponseListener(new BOSHClientResponseListener() {
             public void responseReceived(final BOSHMessageEvent event) {
                 LOG.fine("Received response: " + event.getBody().toXML());
@@ -132,6 +133,7 @@ public abstract class AbstractBOSHTest {
      *  use in validation, or {@code null} to skip those tests
      */
     protected void assertValidators(final AbstractBody scr) {
+        connValidator.done();
         reqValidator.checkAssertions(scr);
         connValidator.checkAssertions();
     }

@@ -23,7 +23,7 @@ package com.kenai.jbosh;
 public interface StubCMListener {
 
     /**
-     * Called when a nre request is made to the connection manager.
+     * Called when a new request is made to the connection manager.
      * 
      * @param conn the new connection
      */

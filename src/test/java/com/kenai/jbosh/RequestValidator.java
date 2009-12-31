@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
@@ -48,7 +49,8 @@ import static org.junit.Assert.*;
  * BOSHClientRequestListener which validates the form and content of the
  * all requests made to the CM by the BOSHClient session.
  */
-public class RequestValidator implements BOSHClientRequestListener {
+public class RequestValidator
+        implements BOSHClientRequestListener, BOSHClientResponseListener {
 
     private static final Logger LOG =
             Logger.getLogger(RequestValidator.class.getName());
@@ -58,6 +60,12 @@ public class RequestValidator implements BOSHClientRequestListener {
     private static final Validator VALIDATOR;
 
     private final AtomicReference<AbstractBody> sessionCreationResponse =
+            new AtomicReference<AbstractBody>();
+
+    private final ConcurrentLinkedQueue<AbstractBody> outstandingRequests =
+            new ConcurrentLinkedQueue<AbstractBody>();
+    
+    private final AtomicReference<AbstractBody> lastRequestResponded =
             new AtomicReference<AbstractBody>();
 
     private List<Node> requests = null;
@@ -85,16 +93,22 @@ public class RequestValidator implements BOSHClientRequestListener {
     private static class Node {
         private final long timestamp;
         private final AbstractBody body;
+        private final AbstractBody respTo;
 
         /**
          * Constructor.
          *
          * @param stamp time in millis when the msg was sent
          * @param msg the sent msg
+         * @param reqRespTo the last request responded to
          */
-        public Node(final long stamp, final AbstractBody msg) {
+        public Node(
+                final long stamp,
+                final AbstractBody msg,
+                final AbstractBody reqRespTo) {
             timestamp = stamp;
             body = msg;
+            respTo = reqRespTo;
         }
 
         /**
@@ -114,6 +128,15 @@ public class RequestValidator implements BOSHClientRequestListener {
         public AbstractBody getBody() {
             return body;
         }
+
+        /**
+         * Get the last request which has been responded to.
+         *
+         * @return last request responded to
+         */
+        public AbstractBody getLastRequestRespondedTo() {
+            return respTo;
+        }
     }
 
     /**
@@ -123,8 +146,19 @@ public class RequestValidator implements BOSHClientRequestListener {
         if (requests == null) {
             requests = new CopyOnWriteArrayList<Node>();
         }
-        Node node = new Node(System.currentTimeMillis(), event.getBody());
+        outstandingRequests.add(event.getBody());
+        Node node = new Node(
+                System.currentTimeMillis(),
+                event.getBody(),
+                lastRequestResponded.get());
         requests.add(node);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void responseReceived(final BOSHMessageEvent event) {
+        lastRequestResponded.set(outstandingRequests.remove());
     }
 
     /**
@@ -455,6 +489,19 @@ public class RequestValidator implements BOSHClientRequestListener {
             String subAck = request.getBody().getAttribute(Attributes.ACK);
             assertNull("subsequent request #" + idx + " can only use acks if "
                     + "advertized in session creation request", subAck);
+        }
+
+        AbstractBody resp = request.getLastRequestRespondedTo();
+        Long lastRID = Long.parseLong(resp.getAttribute(Attributes.RID));
+        ack = request.getBody().getAttribute(Attributes.ACK);
+        if (ack == null) {
+            // Verify implicit ack
+            String rid = request.getBody().getAttribute(Attributes.RID);
+            long implicit = lastRID.longValue() + 1L;
+            assertEquals("Implicit ack when RID != prev + 1",
+                    Long.valueOf(implicit).toString(), rid);
+        } else {
+            assertEquals("Request ack incorrect", lastRID.toString(), ack);
         }
     }
 
