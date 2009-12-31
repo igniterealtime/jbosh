@@ -20,6 +20,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -159,6 +160,21 @@ public class RequestValidator
      */
     public void responseReceived(final BOSHMessageEvent event) {
         lastRequestResponded.set(outstandingRequests.remove());
+    }
+
+    /**
+     * Get a snapshot of the requests which have been sent.
+     *
+     * @return private list of requests already sent
+     */
+    public List<AbstractBody> getRequests() {
+        List<AbstractBody> result = new ArrayList<AbstractBody>();
+        if (requests != null) {
+            for (Node node : requests) {
+                result.add(node.getBody());
+            }
+        }
+        return result;
     }
 
     /**
