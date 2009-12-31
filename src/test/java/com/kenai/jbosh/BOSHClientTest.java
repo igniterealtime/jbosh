@@ -127,7 +127,7 @@ public class BOSHClientTest extends AbstractBOSHTest {
     }
 
     @Test(timeout=10000)
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "unchecked"})
     public void concurrentSends() throws Exception {
         logTestStart();
 
