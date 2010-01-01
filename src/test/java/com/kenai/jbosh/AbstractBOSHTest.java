@@ -22,6 +22,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import static org.junit.Assert.*;
 
 /**
@@ -37,6 +38,11 @@ public abstract class AbstractBOSHTest {
     protected StubCM cm;
     protected BOSHClient session;
     private final AtomicBoolean cleaningUp = new AtomicBoolean();
+
+    @BeforeClass
+    public static void hr() {
+        LOG.info("\n\n\n");
+    }
 
     @Before
     public void setup() throws Exception {
