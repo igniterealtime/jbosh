@@ -1047,6 +1047,11 @@ public final class BOSHClient {
         List<HTTPExchange> toResend = null;
         lock.lock();
         try {
+            if (!isWorking()) {
+                lock.unlock();
+                return;
+            }
+            
             // Check for session creation response info, if needed
             if (cmParams == null) {
                 cmParams = CMSessionParams.fromSessionInit(req, body);
