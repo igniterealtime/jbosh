@@ -71,7 +71,11 @@ final class XLightWebSender implements HTTPSender {
         lock.lock();
         try {
             cfg = session;
-            client = new HttpClient();
+            if (session.getSSLContext() != null) {
+                client = new HttpClient(session.getSSLContext());
+            } else {
+                client = new HttpClient();
+            }
             if (cfg != null &&
                     cfg.getProxyHost() != null &&
                     cfg.getProxyPort() != 0) {
