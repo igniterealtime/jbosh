@@ -58,8 +58,7 @@ public final class ComposableBody extends AbstractBody {
      * BOSH message.
      */
     private static final Pattern BOSH_START =
-            Pattern.compile("<" + "(?:(?:[^:\t\n\r >]+:)|(?:\\{[^\\}>]*?}))?"
-            + "body" + "(?:[\t\n\r ][^>]*?)?" + "(/>|>)");
+            Pattern.compile("<(?:[^:\t\n\r >]+:)?body(?:[\t\n\r ][^>]*?)?(/>|>)");
 
     /**
      * Map of all attributes to their values.
@@ -211,7 +210,7 @@ public final class ComposableBody extends AbstractBody {
      * implementation may change in the future.
      *
      * @param body static body instance to convert
-     * @return composable bosy instance
+     * @return composable body instance
      * @throws BOSHException
      */
     static ComposableBody fromStaticBody(final StaticBody body)
