@@ -5,7 +5,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/ma
     <groupId>com.kenai.jbosh</groupId>
     <artifactId>jbosh</artifactId>
     <packaging>jar</packaging>
-    <version>0.6.0-SNAPSHOT</version>
+    <version>0.7.0-SNAPSHOT</version>
     <name>${groupId}:${artifactId} (${version})</name>
     <url>http://kenai.com/projects/jbosh</url>
     <description>XEP-0124: Bidirectional-streams Over Synchronous HTTP (BOSH)</description>
