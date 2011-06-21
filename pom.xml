@@ -1,0 +1,133 @@
+<!-- vi:set expandtab shiftwidth=4 softtabstop=4: -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.kenai.jbosh</groupId>
+    <artifactId>jbosh</artifactId>
+    <packaging>jar</packaging>
+    <version>0.5.0</version>
+    <name>${groupId}:${artifactId} (${version})</name>
+    <url>http://kenai.com/projects/jbosh</url>
+    <description>XEP-0124: Bidirectional-streams Over Synchronous HTTP (BOSH)</description>
+    <inceptionYear>2009</inceptionYear>
+
+    <licenses>
+        <license>
+            <name>Apache 2</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <issueManagement>
+        <system>JIRA</system>
+        <url>http://kenai.com/jira/browse/JBOSH</url>
+    </issueManagement>
+
+    <scm>
+        <connection>scm:svn:https://kenai.com/svn/jbosh~main</connection>
+        <developerConnection>scm:svn:https://kenai.com/svn/jbosh~main</developerConnection>
+        <url>http://kenai.com/projects/jbosh/sources/main/show</url>
+    </scm>
+
+    <distributionManagement>
+        <snapshotRepository>
+            <id>jbosh.snapshot</id>
+            <url>svn:https://kenai.com/svn/jbosh~maven/snapshot</url>
+        </snapshotRepository>
+        <repository>
+            <id>jbosh.release</id>
+            <url>svn:https://kenai.com/svn/jbosh~maven/release</url>
+        </repository>
+    </distributionManagement>
+
+    <reporting>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </reporting>
+
+    <dependencies>
+        <dependency>
+            <groupId>xpp3</groupId>
+            <artifactId>xpp3</artifactId>
+            <version>1.1.3.3</version>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
+        
+        <dependency>
+            <groupId>org.xlightweb</groupId>
+            <artifactId>xlightweb</artifactId>
+            <version>2.7.3</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.jboss.resteasy</groupId>
+                    <artifactId>jaxrs-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.jboss.resteasy</groupId>
+                    <artifactId>resteasy-jaxrs</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.6</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <extensions>
+            <extension>
+                <groupId>org.jvnet.wagon-svn</groupId>
+                <artifactId>wagon-svn</artifactId>
+                <version>1.9</version>
+            </extension>
+        </extensions>
+        <plugins>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.5</source>
+                    <target>1.5</target>
+                    <optimize>true</optimize>
+                    <debug>true</debug>
+                </configuration>
+            </plugin>
+            <plugin>
+                <artifactId>maven-source-plugin</artifactId>
+                <inherited>true</inherited>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>jar</goal>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <goals>
+                            <goal>jar</goal>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

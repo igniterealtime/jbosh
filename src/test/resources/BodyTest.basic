@@ -1,0 +1,11 @@
+<body content='text/xml; charset=utf-8'
+      hold='1'
+      rid='1573741820'
+      to='server.com'
+      route='xmpp:server.com:6222'
+      secure='false'
+      ver='1.6'
+      wait='60'
+      ack='1'
+      xml:lang='en'
+      xmlns='http://jabber.org/protocol/httpbind'>test <sub/> content</body>
