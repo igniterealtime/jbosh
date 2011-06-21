@@ -16,12 +16,18 @@
 
 package com.kenai.jbosh;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Logger;
 import org.junit.Test;
+import static junit.framework.Assert.*;
 
 /**
  * BOSH XEP-0124 specification section 12 tests:  Polling Sessions.
  */
 public class XEP0124Section12Test extends AbstractBOSHTest {
+
+    private static final Logger LOG =
+            Logger.getLogger(XEP0124Section12Test.class.getName());
 
     /*
      * If it is not possible for a constrained client to either use HTTP
@@ -41,9 +47,73 @@ public class XEP0124Section12Test extends AbstractBOSHTest {
      * client can make) of its Session Creation Response to "1".
      */
     // BOSH CM functionality not supported.
+
     @Test
-    public void clientRespondstoRequestsValue() {
-        // TODO: client response to 'requests' attribute value of '1' in CM resp
+    public void requestBlocksWhenPollResponseOutstanding() throws Exception {
+        logTestStart();
+        // Client response to 'requests' attribute value of '1' in CM resp
+        session.send(ComposableBody.builder().build());
+        StubConnection conn = cm.awaitConnection();
+        AbstractBody scr = ComposableBody.builder()
+                .setAttribute(Attributes.SID, "123XYZ")
+                .setAttribute(Attributes.WAIT, "1")
+                .setAttribute(Attributes.REQUESTS, "1")
+                .build();
+        conn.sendResponse(scr);
+        session.drain();
+
+        // Verify the CM params got picked up correctly
+        CMSessionParams params = session.getCMSessionParams();
+        AttrRequests aReq = params.getRequests();
+        assertNotNull(aReq);
+        assertEquals(1, aReq.intValue());
+
+        // Establish the one allowed connection
+        final ComposableBody resp = ComposableBody.builder()
+            .setAttribute(Attributes.SID, scr.getAttribute(Attributes.SID))
+            .build();
+        session.send(ComposableBody.builder()
+                .setNamespaceDefinition("foo", "http://127.0.0.1/")
+                .setPayloadXML("<foo:bar/>")
+                .build());
+        StubConnection conn1 = cm.awaitConnection();
+
+        // Set up a thread to send another request
+        final AtomicBoolean completed = new AtomicBoolean();
+        final Thread thr = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    session.send(ComposableBody.builder().build());
+                    StubConnection conn2 = cm.awaitConnection();
+                    conn2.sendResponse(resp);
+                } catch (Throwable thr) {
+                    // Ignore.  It will register as a failure anyhow.
+                } finally {
+                    completed.set(true);
+                }
+            }
+        });
+
+        // Run the other thread and make sure it blocks
+        boolean pass = false;
+        try {
+            thr.start();
+            try {
+                // If we havent completed after 1.5 seconds, that's good
+                Thread.sleep(1500);
+                pass = thr.isAlive();
+            } catch (InterruptedException intx) {
+                // Not expected
+            }
+        } finally {
+            thr.interrupt();
+        }
+
+        // Cleanup
+        conn1.sendResponse(resp);
+
+        assertTrue("Did not block until response was given", pass);
+        assertValidators(scr);
     }
 
     /*
@@ -65,6 +135,85 @@ public class XEP0124Section12Test extends AbstractBOSHTest {
      * 'policy-violation' terminal binding error to the client.
      */
     // BOSH CM functionality not supported.
+
+    @Test
+    public void verifyOveractivePolling() throws Exception {
+        logTestStart();
+        testedBy(ConnectionValidator.class, "validateOveractivePolling");
+
+        // Client response to 'requests' attribute value of '1' in CM resp
+        session.send(ComposableBody.builder().build());
+        StubConnection conn = cm.awaitConnection();
+        AbstractBody scr = ComposableBody.builder()
+                .setAttribute(Attributes.SID, "123XYZ")
+                .setAttribute(Attributes.WAIT, "1")
+                .setAttribute(Attributes.REQUESTS, "1")
+                .setAttribute(Attributes.POLLING, "1")
+                .build();
+        conn.sendResponse(scr);
+        session.drain();
+
+        // Two consecutive, empty requests
+        session.send(ComposableBody.builder().build());
+        conn = cm.awaitConnection();
+        conn.sendResponse(ComposableBody.builder()
+                .setAttribute(Attributes.SID, scr.getAttribute(Attributes.SID))
+                .build());
+        session.send(ComposableBody.builder().build());
+        conn = cm.awaitConnection();
+        conn.sendResponse(ComposableBody.builder()
+                .setAttribute(Attributes.SID, scr.getAttribute(Attributes.SID))
+                .build());
+        session.drain();
+
+        boolean pass = true;
+        try {
+            assertValidators(scr);
+            pass = false;
+        } catch (Error err) {
+            // Good, we caught it!
+            LOG.info("Caught assertion failure: " + err.getMessage());
+        }
+        if (!pass) {
+            fail("did not catch overactive polling");
+        }
+    }
+
+    @Test(timeout=5000)
+    public void overactivePollingCausedByIdle() throws Exception {
+        logTestStart();
+        testedBy(ConnectionValidator.class, "validateOveractivePolling");
+
+        // Client response to 'requests' attribute value of '1' in CM resp
+        session.send(ComposableBody.builder().build());
+        StubConnection conn = cm.awaitConnection();
+        AbstractBody scr = ComposableBody.builder()
+                .setAttribute(Attributes.SID, "123XYZ")
+                .setAttribute(Attributes.WAIT, "1")
+                .setAttribute(Attributes.REQUESTS, "1")
+                .setAttribute(Attributes.POLLING, "3")
+                .setAttribute(Attributes.INACTIVITY, "4")
+                .setNamespaceDefinition("foo", "http://127.0.0.1/")
+                .setPayloadXML("<foo:bar/>")
+                .build();
+        conn.sendResponse(scr);
+        session.drain();
+
+        // Send one empty request
+        session.send(ComposableBody.builder().build());
+        StubConnection conn1 = cm.awaitConnection();
+        conn1.sendResponse(ComposableBody.builder()
+                .setAttribute(Attributes.SID, scr.getAttribute(Attributes.SID))
+                .build());
+
+        // Now wait for the empty request caused by idling
+        StubConnection conn2 = cm.awaitConnection();
+        conn2.sendResponse(ComposableBody.builder()
+                .setAttribute(Attributes.SID, scr.getAttribute(Attributes.SID))
+                .build());
+
+        assertValidators(scr);
+    }
 
     /*
      * If the connection manager did not specify a 'polling' attribute in the

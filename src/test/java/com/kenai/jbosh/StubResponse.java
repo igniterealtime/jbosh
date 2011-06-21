@@ -33,6 +33,14 @@ public class StubResponse {
     StubResponse(
             final HttpResponseHeader respHead,
             final AbstractBody respBody) {
+        if (respHead == null) {
+            throw(new IllegalArgumentException(
+                    "respHead may not be null"));
+        }
+        if (respBody == null) {
+            throw(new IllegalArgumentException(
+                    "respBody may not be null"));
+        }
         body = respBody;
         resp = respHead;
     }

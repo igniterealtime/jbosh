@@ -82,7 +82,9 @@ final class XLightWebSender implements HTTPSender {
     public void destroy() {
         lock.lock();
         try {
-            client.close();
+            if (client != null) {
+                client.close();
+            }
         } catch (IOException iox) {
             LOG.log(Level.FINEST, "Ignoring exception on close", iox);
         } finally {
@@ -95,7 +97,9 @@ final class XLightWebSender implements HTTPSender {
     /**
      * {@inheritDoc}
      */
-    public HTTPResponse send(final CMSessionParams params, final AbstractBody body) {
+    public HTTPResponse send(
+            final CMSessionParams params,
+            final AbstractBody body) {
         HttpClient mClient;
         BOSHClientConfig mCfg;
         lock.lock();

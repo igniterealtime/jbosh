@@ -16,6 +16,8 @@
 
 package com.kenai.jbosh;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Test;
 import static junit.framework.Assert.*;
 
@@ -107,6 +109,20 @@ public class XEP0124Section17Test extends AbstractBOSHTest {
     @Test(timeout=5000)
     public void testTerminalBindingError() throws Exception {
         logTestStart();
+
+        final AtomicBoolean connected = new AtomicBoolean();
+        final AtomicReference<Throwable> caught =
+                new AtomicReference<Throwable>();
+        session.addBOSHClientConnListener(new BOSHClientConnListener() {
+            public void connectionEvent(final BOSHClientConnEvent connEvent) {
+                connected.set(connEvent.isConnected());
+                caught.set(connEvent.getCause());
+            }
+        });
+
+        assertFalse(connected.get());
+        assertNull(caught.get());
+
         // Initiate a new session
         session.send(ComposableBody.builder().build());
         StubConnection conn = cm.awaitConnection();
@@ -118,8 +134,14 @@ public class XEP0124Section17Test extends AbstractBOSHTest {
                 .setAttribute(Attributes.CONDITION, "bad-request")
                 .build();
         conn.sendResponse(scr);
+        session.drain();
 
-        // TODO: should receive close event
+        assertFalse(connected.get());
+        assertNotNull(caught.get());
+        BOSHException boshx = (BOSHException) caught.get();
+        assertTrue(boshx.getMessage().contains(
+                TerminalBindingCondition.BAD_REQUEST.getMessage()));
+
         // Attempts to send anything else should fail
         try {
             session.send(ComposableBody.builder().build());
@@ -128,7 +150,7 @@ public class XEP0124Section17Test extends AbstractBOSHTest {
                     .setAttribute(Attributes.SID, "123XYZ")
                     .build());
             fail("Shouldn't be able to send after terminal binding error");
-        } catch (BOSHException boshx) {
+        } catch (BOSHException ex) {
             // Good
         }
         assertValidators(scr);
@@ -200,15 +222,93 @@ public class XEP0124Section17Test extends AbstractBOSHTest {
     /*
      * If it decides to recover from the error, then the client MUST repeat the
      * HTTP request that resulted in the error, as well as all the preceding
-     * HTTP requests that have not received responses.
+     * HTTP requests that have not received responses.  The content of these
+     * requests MUST be identical to the <body/> elements of the original
+     * requests.
      */
-    // TODO: Retry recoverable errors
+    @Test(timeout=5000)
+    public void retryRecoverableErrors() throws Exception {
+        logTestStart();
+        String testURI = "http://kenai.com/jbosh/junit";
+        BodyQName ref = BodyQName.createWithPrefix(testURI, "ref", "test");
 
-    /*
-     * The content of these requests MUST be identical to the <body/> elements
-     * of the original requests.
-     */
-    // TODO: Test that there are no changes made to the messages of retries
+        // Initiate a new session
+        session.send(ComposableBody.builder().build());
+        StubConnection conn = cm.awaitConnection();
+        AbstractBody scr = ComposableBody.builder()
+                .setAttribute(Attributes.SID, "123XYZ")
+                .setAttribute(Attributes.WAIT, "1")
+                .setAttribute(Attributes.REQUESTS, "3")
+                .build();
+        conn.sendResponse(scr);
+        session.drain();
+
+        /*
+         * For testing purposes, try to ensure that the retransmitted
+         * messages arrive in the intended order.  Without this, the
+         * race condition becomes close enough to notice.  In
+         * production, the CM would normally know how to respond to
+         * out of order request receipt.
+         */
+        session.addBOSHClientRequestListener(new BOSHClientRequestListener() {
+            public void requestSent(BOSHMessageEvent event) {
+                // Add a delay to enforce intended message ordering
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException intx) {
+                    // Ignore
+                }
+            }
+        });
+
+        // Send a couple requests
+        session.send(ComposableBody.builder()
+                .setNamespaceDefinition("test", testURI)
+                .setAttribute(ref, "Req1")
+                .build());
+        StubConnection conn1 = cm.awaitConnection();
+        session.send(ComposableBody.builder()
+                .setNamespaceDefinition("test", testURI)
+                .setAttribute(ref, "Req2")
+                .build());
+        StubConnection conn2 = cm.awaitConnection();
+
+        // Dump an arbitrary response for the second connection
+        String expected2 = conn2.getRequest().getBody().toXML();
+        conn2.sendResponse(ComposableBody.builder()
+                .setNamespaceDefinition("test", testURI)
+                .setAttribute(ref, "Resp2")
+                .build());
+
+        // Now respond to the first request with a recoverable error
+        String expected1 = conn1.getRequest().getBody().toXML();
+        conn1.sendResponse(ComposableBody.builder()
+                .setNamespaceDefinition("test", testURI)
+                .setAttribute(Attributes.TYPE, "error")
+                .setAttribute(ref, "Resp1")
+                .build());
+
+        // We should now receive requests which are duplicates of msg 1 and 2
+
+        // Get msg 1 duplicate
+        conn = cm.awaitConnection();
+        String actual1 = conn.getRequest().getBody().toXML();
+        conn.sendResponse(ComposableBody.builder()
+                .setNamespaceDefinition("test", testURI)
+                .setAttribute(ref, "Resp3")
+                .build());
+        assertEquals(expected1, actual1);
+
+        // Get msg 2 duplicate
+        conn = cm.awaitConnection();
+        String actual2 = conn.getRequest().getBody().toXML();
+        conn.sendResponse(ComposableBody.builder()
+                .setNamespaceDefinition("test", testURI)
+                .setAttribute(ref, "Resp4")
+                .build());
+        assertEquals(expected2, actual2);
+        session.drain();
+    }
 
     ///////////////////////////////////////////////////////////////////////////
     // XEP-0124 Section 17.4: XML Payload Conditions

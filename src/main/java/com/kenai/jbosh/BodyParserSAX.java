@@ -169,7 +169,7 @@ final class BodyParserSAX implements BodyParser {
         } catch (IOException iox) {
             thrown = iox;
         }
-        throw(new BOSHException("Could not parse body", thrown));
+        throw(new BOSHException("Could not parse body:\n" + xml, thrown));
     }
 
     ///////////////////////////////////////////////////////////////////////////

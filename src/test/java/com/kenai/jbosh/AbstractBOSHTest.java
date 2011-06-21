@@ -17,6 +17,7 @@
 package com.kenai.jbosh;
 
 import java.lang.reflect.Method;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.junit.After;
@@ -32,12 +33,17 @@ public abstract class AbstractBOSHTest {
     protected static final String NS_URI = BodyQName.BOSH_NS_URI;
     protected final RequestValidator reqValidator =
             new RequestValidator();
+    protected ConnectionValidator connValidator;
     protected StubCM cm;
     protected BOSHClient session;
+    private final AtomicBoolean cleaningUp = new AtomicBoolean();
 
     @Before
     public void setup() throws Exception {
+        cleaningUp.set(false);
+        connValidator = new ConnectionValidator();
         cm = new StubCM();
+        cm.addStubCMListener(connValidator);
         LOG.info("========================================");
         LOG.info("Stub CM started at: " + cm.getURI().toString());
         BOSHClientConfig cfg = BOSHClientConfig.Builder
@@ -48,8 +54,11 @@ public abstract class AbstractBOSHTest {
 
     @After
     public void tearDown() throws Exception {
+        cleaningUp.set(true);
         cm.dispose();
+        connValidator = null;
         LOG.info("Stub CM disposed of");
+        session.close();
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -84,12 +93,19 @@ public abstract class AbstractBOSHTest {
                     if (cause == null) {
                         LOG.info("Connection closed");
                     } else {
-                        LOG.log(Level.INFO,
-                                "Connection closed on error", cause);
+                        if (cleaningUp.get()) {
+                            LOG.fine("Connection closed on error: "
+                                    + cause.getClass().getName()
+                                    + " - " + cause.getMessage());
+                        } else {
+                            LOG.log(Level.INFO,
+                                    "Connection closed on error", cause);
+                        }
                     }
                 }
             }
         });
+        connValidator.setBOSHClient(result);
         return result;
     }
 
@@ -117,7 +133,7 @@ public abstract class AbstractBOSHTest {
      */
     protected void assertValidators(final AbstractBody scr) {
         reqValidator.checkAssertions(scr);
-        ConnectionValidator.checkAssertions(cm);
+        connValidator.checkAssertions();
     }
 
     /**

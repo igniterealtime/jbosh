@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# vi:set expandtab shiftwidth=4 softtabstop=4:
+
+DIR_EXEC=$( cd $(dirname ${0}); pwd )
+DIR_BASE=$( cd ${DIR_EXEC}/..; pwd )
+DIR_SITE=${DIR_BASE}/target/site
+DIR_TMP=/tmp/$(basename ${0}).$$
+SITE_URL="https://kenai.com/website/jbosh"
+SITE_SUBDIRS="apidocs xref"
+DEST="release"
+
+[ -z "${SITE_ID}" ] && SITE_ID="jbosh.site"
+[ -z "${SETTINGS_XML}" ] && SETTINGS_XML="${HOME}/.m2/settings.xml"
+
+###############################################################################
+## Functions:
+
+exiting() {
+    typeset status=${1:-0}
+    trap - TERM HUP QUIT INT EXIT
+    if [ -n "${DEBUG}" ]; then
+        cd ${DIR_TMP}
+        HOME=${DIR_TMP} PS1=DEBUG:\$ bash
+    fi
+    cd /
+    rm -fr ${DIR_TMP}
+    exit ${status}
+}
+
+###############################################################################
+## Mainline:
+
+if [ ! -d "${DIR_SITE}" ]; then
+    echo "ERROR: Site directory not found: ${DIR_SITE}" 1>&2
+    echo "       Run 'mvn site:site' to build it." 1>&2
+    exit 1
+elif [ ! -f "${SETTINGS_XML}" ]; then
+    echo "ERROR: Settings file not found: ${SETTINGS_XML}" 1>&2
+    echo "       This script requires the '${SITE_ID}' site to be configured in this file."
+    exit 1
+fi
+
+for cmd in cadaver ruby; do
+    which ${cmd} > /dev/null 2>&1
+    if [ ${?} -ne 0 ]; then
+        echo "ERROR: Could not find '${cmd}' on the PATH" 1>&2
+        exiting 1
+    fi
+done
+
+# Create a temp dir
+trap "exiting -1" TERM HUP QUIT INT EXIT
+mkdir -p ${DIR_TMP}
+
+# Create a Ruby script to extract the username and password from settings.xml
+cat > ${DIR_TMP}/userpass.rb << EOF
+require "rexml/document"
+include REXML
+file = File.new("${SETTINGS_XML}")
+doc = Document.new(file)
+server = XPath.first(doc, "//servers/server[id='${SITE_ID}']")
+username = XPath.first(server, "username")
+password = XPath.first(server, "passphrase")
+raise "Could not find username and password" if username.nil? or password.nil?
+puts "default"
+puts "    login #{username.text}"
+puts "    password #{password.text}"
+EOF
+
+# Create .netrc using the username and password from the settings.xml file
+ruby -- ${DIR_TMP}/userpass.rb > ${DIR_TMP}/.netrc
+if [ ${?} -ne 0 ]; then
+    echo "Could not locate username and passphrase in ${SETTINGS_XML}" 1>&2
+    exiting 1
+fi
+
+# Create a Ruby script to extract the version
+cat > ${DIR_TMP}/project_env.rb << EOF
+require "rexml/document"
+include REXML
+file = File.new("${DIR_BASE}/pom.xml")
+doc = Document.new(file)
+version = XPath.first(doc, "/project/version")
+raise "Could not find version" if version.nil?
+puts "VERSION='#{version.text}'"
+EOF
+
+# Import our version info
+ruby -- ${DIR_TMP}/project_env.rb > ${DIR_TMP}/project_env
+if [ ${?} -ne 0 ]; then
+    echo "Could not locate version in ${DIR_BASE}/pom.xml" 1>&2
+    exiting 1
+fi
+. ${DIR_TMP}/project_env
+
+SCRIPT=${DIR_TMP}/.cadaverrc
+# Create a cadaver script
+cat > ${SCRIPT} <<EOF
+open ${SITE_URL}
+y
+EOF
+
+typeset dest=${DEST}/${VERSION}
+typeset first=1
+while [ 1 ]; do
+    typeset col=${dest%%/*}
+    dest=${dest#*/}
+    [ "${col}" = "${dest}" ] && echo "rmcol ${col}" >> ${SCRIPT}
+    echo "mkcol ${col}" >> ${SCRIPT}
+    echo "cd ${col}" >> ${SCRIPT}
+    [ "${col}" = "${dest}" ] && break
+done
+
+cd ${DIR_SITE}
+find ${SITE_SUBDIRS} -type d | sed 's/^/mkcol /g' >> ${SCRIPT}
+find ${SITE_SUBDIRS} -type f | awk '{print "put", $1, $1}' >> ${SCRIPT}
+echo "exit" >> ${SCRIPT}
+
+HOME=${DIR_TMP} cadaver
+
+exiting 0

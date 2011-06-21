@@ -16,6 +16,8 @@
 
 package com.kenai.jbosh;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * Data type representing the getValue of the {@code maxpause} attribute of the
  * {@code bosh} element.
@@ -50,4 +52,14 @@ final class AttrMaxPause extends AbstractIntegerAttr {
         }
     }
     
+    /**
+     * Get the max pause time in milliseconds.
+     *
+     * @return pause tme in milliseconds
+     */
+    public int getInMilliseconds() {
+        return (int) TimeUnit.MILLISECONDS.convert(
+                intValue(), TimeUnit.SECONDS);
+    }
+
 }

@@ -61,7 +61,7 @@ public class XEP0124Section07Test extends AbstractBOSHTest {
      * Clients that only support Polling Sessions MAY prevent the connection
      * manager from waiting by setting 'wait' or 'hold' to "0".
      */
-    // TODO: Implement and test explicit polling session?
+    // Tested in Section 12
 
     /*
      * A connection manager MAY be configured to enable sessions with more than

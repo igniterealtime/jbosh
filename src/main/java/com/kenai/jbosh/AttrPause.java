@@ -19,47 +19,47 @@ package com.kenai.jbosh;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Data type representing the getValue of the {@code polling} attribute of the
+ * Data type representing the getValue of the {@code pause} attribute of the
  * {@code bosh} element.
  */
-final class AttrPolling extends AbstractIntegerAttr {
-
+final class AttrPause extends AbstractIntegerAttr {
+    
     /**
      * Creates a new attribute object.
      * 
      * @param val attribute getValue
      * @throws BOSHException on parse or validation failure
      */
-    private AttrPolling(final String str) throws BOSHException {
-        super(str);
-        checkMinValue(0);
+    private AttrPause(final String val) throws BOSHException {
+        super(val);
+        checkMinValue(1);
     }
 
     /**
      * Creates a new attribute instance from the provided String.
      * 
      * @param str string representation of the attribute
-     * @return instance of the attribute for the specified string, or
-     *  {@code null} if input string is {@code null}
+     * @return attribute instance or {@code null} if provided string is
+     *  {@code null}
      * @throws BOSHException on parse or validation failure
      */
-    static AttrPolling createFromString(final String str)
+    static AttrPause createFromString(final String str)
     throws BOSHException {
         if (str == null) {
             return null;
         } else {
-            return new AttrPolling(str);
+            return new AttrPause(str);
         }
     }
-
+    
     /**
-     * Get the polling interval in milliseconds.
+     * Get the pause time in milliseconds.
      *
-     * @return polling interval in milliseconds
+     * @return pause tme in milliseconds
      */
     public int getInMilliseconds() {
         return (int) TimeUnit.MILLISECONDS.convert(
                 intValue(), TimeUnit.SECONDS);
     }
-    
+
 }

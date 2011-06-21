@@ -16,21 +16,23 @@
 
 package com.kenai.jbosh;
 
-import org.junit.Test;
-
 /**
- * BOSH XEP-0124 specification section 4 tests: The BOSH Technique.
+ * Interface used to monitor connections made to the stub connection
+ * manager.
  */
-public class XEP0124Section04Test extends AbstractBOSHTest {
+public interface StubCMListener {
 
-    /*
-     * The client SHOULD NOT open more than two HTTP connections to the
-     * connection manager at the same time, [12] so it would otherwise have to
-     * wait until the connection manager responds to one of the requests.
+    /**
+     * Called when a nre request is made to the connection manager.
+     * 
+     * @param conn the new connection
      */
-    @Test
-    public void concurrentConnections() {
-        testedBy(ConnectionValidator.class, "validateConnectionCount");
-    }
+    void requestReceived(StubConnection conn);
 
+    /**
+     * Called when a response has been sent.
+     *
+     * @param conn the connection which just had it's response sent
+     */
+    void requestCompleted(StubConnection conn);
 }

@@ -295,7 +295,6 @@ public class XEP0124Section06Test extends AbstractBOSHTest {
                         .setAttribute(Attributes.SID, "1")
                         .setAttribute(Attributes.WAIT, waitStr)
                         .setAttribute(Attributes.VER, verStr)
-                        .setAttribute(Attributes.POLLING, "1")
                         .setAttribute(Attributes.INACTIVITY, "3")
                         .setAttribute(Attributes.HOLD, holdStr)
                         .build();
