@@ -5,11 +5,16 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/ma
     <groupId>com.kenai.jbosh</groupId>
     <artifactId>jbosh</artifactId>
     <packaging>jar</packaging>
+    <name>JBOSH - Java BOSH Library</name>
     <version>0.7.0-SNAPSHOT</version>
-    <name>com.kenai.jbosh:jbosh</name>
-    <url>http://kenai.com/projects/jbosh</url>
     <description>XEP-0124: Bidirectional-streams Over Synchronous HTTP (BOSH)</description>
+    <url>http://kenai.com/projects/jbosh</url>
     <inceptionYear>2009</inceptionYear>
+    <parent>
+        <groupId>org.sonatype.oss</groupId>
+        <artifactId>oss-parent</artifactId>
+        <version>7</version>
+    </parent>
 
     <licenses>
         <license>
@@ -18,55 +23,43 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/ma
             <distribution>repo</distribution>
         </license>
     </licenses>
-
     <issueManagement>
         <system>JIRA</system>
         <url>http://kenai.com/jira/browse/JBOSH</url>
     </issueManagement>
-
     <scm>
-        <connection>scm:svn:https://kenai.com/svn/jbosh~main</connection>
-        <developerConnection>scm:svn:https://kenai.com/svn/jbosh~main</developerConnection>
-        <url>http://kenai.com/projects/jbosh/sources/main/show</url>
+        <connection>scm:git:git://kenai.com/jbosh~origin</connection>
+        <developerConnection>scm:git:git://kenai.com/jbosh~origin</developerConnection>
+        <url>http://kenai.com/projects/jbosh/sources/origin/show</url>
     </scm>
+    <developers>
+        <developer>
+            <id>mcumings</id>
+            <name>Mike Cumings</name>
+            <email>mcumings@scummer.org</email>
+        </developer>
+    </developers>
+    <contributors>
+        <contributor>
+            <name>Sumit Jaiswal</name>
+        </contributor>
+        <contributor>
+            <name>Glenn Maynard</name>
+        </contributor>
+        <contributor>
+            <name>Guenther Niess</name>
+        </contributor>
+    </contributors>
 
-    <distributionManagement>
-        <snapshotRepository>
-            <id>jbosh.snapshot</id>
-            <url>svn:https://kenai.com/svn/jbosh~maven/snapshot</url>
-        </snapshotRepository>
-        <repository>
-            <id>jbosh.release</id>
-            <url>svn:https://kenai.com/svn/jbosh~maven/release</url>
-        </repository>
-    </distributionManagement>
-
-    <reporting>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jxr-plugin</artifactId>
-            </plugin>
-        </plugins>
-    </reporting>
-
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
     <dependencies>
-        <dependency>
-            <groupId>xpp3</groupId>
-            <artifactId>xpp3</artifactId>
-            <version>1.1.3.3</version>
-            <scope>provided</scope>
-            <optional>true</optional>
-        </dependency>
-        
         <dependency>
             <groupId>org.xlightweb</groupId>
             <artifactId>xlightweb</artifactId>
             <version>2.5</version>
+            <optional>true</optional>
             <exclusions>
                 <exclusion>
                     <groupId>org.jboss.resteasy</groupId>
@@ -82,7 +75,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/ma
                 </exclusion>
             </exclusions>
         </dependency>
-
+        <dependency>
+            <groupId>xpp3</groupId>
+            <artifactId>xpp3</artifactId>
+            <version>1.1.3.3</version>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
@@ -92,13 +91,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/ma
     </dependencies>
 
     <build>
-        <extensions>
-            <extension>
-                <groupId>org.jvnet.wagon-svn</groupId>
-                <artifactId>wagon-svn</artifactId>
-                <version>1.9</version>
-            </extension>
-        </extensions>
         <plugins>
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -154,6 +146,33 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/ma
                         <configuration>
                             <argLine>-Djava.util.logging.config.file=test_logging.properties</argLine>
                         </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>release-sign-artifacts</id>
+            <activation>
+                <property>
+                    <name>performRelease</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>1.3</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
                     </plugin>
                 </plugins>
             </build>
