@@ -1,0 +1,132 @@
+apply plugin: 'java'
+apply plugin: 'maven'
+apply plugin: 'eclipse'
+apply plugin: 'osgi'
+apply plugin: 'signing'
+
+ext {
+	shortVersion = '0.6.0'
+	isSnapshot = false
+	gitCommit = getGitCommit()
+	sonatypeCredentialsAvailable = project.hasProperty('sonatypeUsername') && project.hasProperty('sonatypePassword')
+	isReleaseVersion = !isSnapshot
+	signingRequired = isReleaseVersion
+	sonatypeSnapshotUrl = 'https://oss.sonatype.org/content/repositories/snapshots'
+	sonatypeStagingUrl = 'https://oss.sonatype.org/service/local/staging/deploy/maven2'
+	buildDate = (new java.text.SimpleDateFormat("yyyy-MM-dd")).format(new Date())
+}
+
+group = 'org.igniterealtime.jbosh'
+sourceCompatibility = 1.6
+version = shortVersion
+if (isSnapshot) {
+	version += '-SNAPSHOT'
+}
+
+description = """\
+JBOSH ${version}
+XEP-0124: Bidirectional-streams Over Synchronous HTTP (BOSH)
+"""
+
+import org.gradle.plugins.signing.Sign
+gradle.taskGraph.whenReady { taskGraph ->
+	if (signingRequired && taskGraph.allTasks.any { it instanceof Sign }) {
+		// Use Java 6's console to read from the console (no good for a CI environment)
+		Console console = System.console()
+		console.printf '\n\nWe have to sign some things in this build.\n\nPlease enter your signing details.\n\n'
+		def password = console.readPassword('GnuPG Private Key Password: ')
+
+		allprojects { ext.'signing.password' = password }
+
+		console.printf '\nThanks.\n\n'
+	}
+}
+
+uploadArchives {
+	repositories {
+		mavenDeployer {
+			if (signingRequired) {
+				beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+			}
+			repository(url: project.sonatypeStagingUrl) {
+				if (sonatypeCredentialsAvailable) {
+					authentication(userName: sonatypeUsername, password: sonatypePassword)
+				}
+			}
+			snapshotRepository(url: project.sonatypeSnapshotUrl) {
+				if (sonatypeCredentialsAvailable) {
+					authentication(userName: sonatypeUsername, password: sonatypePassword)
+				}
+			}
+			pom.project {
+				name 'JBOSH'
+				description 'XEP-0124: Bidirectional-streams Over Synchronous HTTP (BOSH)'
+				packaging 'jar'
+				url 'http://www.igniterealtime.org/projects/jbosh/'
+
+				scm {
+					url 'https://github.com/igniterealtime/jbosh'
+					connection 'scm:git:https://github.com/igniterealtime/jbosh.git'
+					developerConnection 'scm:git:https://github.com/igniterealtime/jbosh.git'
+				}
+
+				licenses {
+					license {
+						name 'The Apache Software License, Version 2.0'
+						url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+						distribution 'repo'
+					}
+				}
+
+				developers {
+					developer {
+						id 'flow'
+						name 'Florian Schmaus'
+						email 'flow@igniterealtime.org'
+					}
+				}
+			}
+		}
+	}
+}
+
+signing {
+	required { signingRequired }
+	sign configurations.archives
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	compile 'xpp3:xpp3:1.1.4c'
+	compile 'org.xlightweb:xlightweb:2.5'
+	testCompile 'junit:junit:4.+'
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+	classifier = 'sources'
+	from sourceSets.main.allSource
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+	classifier = 'javadoc'
+	from javadoc.destinationDir
+}
+
+artifacts {
+	archives sourcesJar
+	archives javadocJar
+}
+
+def getGitCommit() {
+	def dotGit = new File("$projectDir/.git")
+	if (!dotGit.isDirectory()) return 'non-git build'
+
+	def cmd = 'git describe --tags --dirty=+'
+	def proc = cmd.execute()
+	def gitCommit = proc.text.trim()
+	assert !gitCommit.isEmpty()
+	gitCommit
+}
