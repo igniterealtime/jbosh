@@ -5,8 +5,8 @@ apply plugin: 'osgi'
 apply plugin: 'signing'
 
 ext {
-	shortVersion = '0.7.0'
-	isSnapshot = false
+	shortVersion = '0.8.0'
+	isSnapshot = true
 	gitCommit = getGitCommit()
 	sonatypeCredentialsAvailable = project.hasProperty('sonatypeUsername') && project.hasProperty('sonatypePassword')
 	isReleaseVersion = !isSnapshot
