@@ -3,6 +3,7 @@ apply plugin: 'maven'
 apply plugin: 'eclipse'
 apply plugin: 'osgi'
 apply plugin: 'signing'
+apply plugin: 'checkstyle'
 
 ext {
 	shortVersion = '0.8.0'
