@@ -59,7 +59,8 @@ public final class ComposableBody extends AbstractBody {
      */
     private static final Pattern BOSH_START =
             Pattern.compile("<(?:[^:\t\n\r >]+:)?body(?:[\t\n\r ][^>]*?)?(/>|>)");
-
+         // Pattern.compile("<(?:(?:[^:\t\n\r >]+:)|(?:\\{[^\\}>]*?\\}))?"
+         // This is what aSmack used
     /**
      * Map of all attributes to their values.
      */

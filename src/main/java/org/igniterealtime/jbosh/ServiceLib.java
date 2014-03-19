@@ -105,7 +105,7 @@ final class ServiceLib {
         }
 
         ClassLoader loader = ServiceLib.class.getClassLoader();
-        URL url = loader.getResource("META-INF/services/" + ofClass.getName());
+        URL url = loader.getResource("org.igniterealtime.jbosh/" + ofClass.getName());
         if (url == null) {
             // Early-out
             return result;
