@@ -6,8 +6,8 @@ apply plugin: 'signing'
 apply plugin: 'checkstyle'
 
 ext {
-	shortVersion = '0.8.0'
-	isSnapshot = false
+	shortVersion = '0.9.0'
+	isSnapshot = true
 	gitCommit = getGitCommit()
 	sonatypeCredentialsAvailable = project.hasProperty('sonatypeUsername') && project.hasProperty('sonatypePassword')
 	isReleaseVersion = !isSnapshot
