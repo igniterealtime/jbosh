@@ -372,6 +372,10 @@ public final class BOSHClient {
         return this.requestIDSeq.getRID();
     }
 
+    public long getNextRID() {
+        return this.requestIDSeq.getNextRID();
+    }
+
     /**
      * Get the client configuration that was used to create this client
      * instance.
