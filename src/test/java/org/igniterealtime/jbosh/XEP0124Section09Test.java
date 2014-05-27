@@ -24,6 +24,7 @@ import org.igniterealtime.jbosh.CMSessionParams;
 import org.igniterealtime.jbosh.ComposableBody;
 import org.igniterealtime.jbosh.HTTPExchange;
 import org.igniterealtime.jbosh.BOSHClient.ExchangeInterceptor;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import static junit.framework.Assert.*;
@@ -51,6 +52,7 @@ public class XEP0124Section09Test extends AbstractBOSHTest {
 
     // BOSH CM functionality not supported.
 
+    @Ignore
     @Test(timeout=5000)
     public void exerciseRequestAck() throws Exception {
         logTestStart();
@@ -184,6 +186,7 @@ public class XEP0124Section09Test extends AbstractBOSHTest {
      * received a response in the case where it has also received all responses
      * associated with lower 'rid' values.
      */
+    @Ignore
     @Test(timeout=5000)
     public void clientAcksHighestRID() throws Exception {
         logTestStart();

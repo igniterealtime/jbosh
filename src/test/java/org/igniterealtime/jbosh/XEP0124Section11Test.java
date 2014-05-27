@@ -29,6 +29,7 @@ import org.igniterealtime.jbosh.BOSHException;
 import org.igniterealtime.jbosh.CMSessionParams;
 import org.igniterealtime.jbosh.ComposableBody;
 import org.igniterealtime.jbosh.TerminalBindingCondition;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import static junit.framework.Assert.*;
@@ -43,6 +44,7 @@ public class XEP0124Section11Test extends AbstractBOSHTest {
      * the 'requests' attribute in the connection manager's Session Creation
      * Response.
      */
+    @Ignore
     @Test(timeout=3000)
     public void maxRequestsOutstanding() throws Exception {
         logTestStart();
@@ -116,6 +118,7 @@ public class XEP0124Section11Test extends AbstractBOSHTest {
      * terminate a session.
      */
 
+    @Ignore
     @Test(timeout=3000)
     public void maxRequestsPlusTerminate() throws Exception {
         logTestStart();

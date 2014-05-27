@@ -29,6 +29,7 @@ import org.igniterealtime.jbosh.BOSHMessageEvent;
 import org.igniterealtime.jbosh.BodyQName;
 import org.igniterealtime.jbosh.ComposableBody;
 import org.igniterealtime.jbosh.TerminalBindingCondition;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import static junit.framework.Assert.*;
@@ -238,6 +239,7 @@ public class XEP0124Section17Test extends AbstractBOSHTest {
      * requests MUST be identical to the <body/> elements of the original
      * requests.
      */
+    @Ignore
     @Test(timeout=5000)
     public void retryRecoverableErrors() throws Exception {
         logTestStart();
