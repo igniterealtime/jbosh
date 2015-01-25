@@ -105,7 +105,7 @@ dependencies {
 	compile 'xpp3:xpp3:1.1.4c'
 	compile 'org.apache.httpcomponents:httpclient:4.3.3'
 	testCompile 'org.xlightweb:xlightweb:2.5'
-	testCompile 'junit:junit:4.+'
+	testCompile 'junit:junit:4.12'
 }
 
 task sourcesJar(type: Jar, dependsOn: classes) {
