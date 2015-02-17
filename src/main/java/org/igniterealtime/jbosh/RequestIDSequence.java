@@ -18,8 +18,6 @@ package org.igniterealtime.jbosh;
 
 import java.security.SecureRandom;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Request ID sequence generator.  This generator generates a random first
@@ -60,15 +58,10 @@ final class RequestIDSequence {
     private static final SecureRandom RAND = new SecureRandom();
 
     /**
-     * Internal lock.
-     */
-    private static final Lock LOCK = new ReentrantLock();
-
-    /**
      * The last reqest ID used, or &lt;= 0 if a new request ID needs to be
      * generated.
      */
-    private AtomicLong nextRequestID = new AtomicLong();
+    private final AtomicLong nextRequestID;
 
     ///////////////////////////////////////////////////////////////////////////
     // Constructors:
@@ -106,14 +99,9 @@ final class RequestIDSequence {
      */
     private long generateInitialValue() {
         long result;
-        LOCK.lock();
-        try {
-            do {
-                result = RAND.nextLong() & MASK;
-            } while (result > MAX_INITIAL);
-        } finally {
-            LOCK.unlock();
-        }
+        do {
+            result = RAND.nextLong() & MASK;
+        } while (result > MAX_INITIAL);
         return result;
     }
 
