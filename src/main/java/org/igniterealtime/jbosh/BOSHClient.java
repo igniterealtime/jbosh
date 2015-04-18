@@ -53,7 +53,7 @@ import org.igniterealtime.jbosh.ComposableBody.Builder;
  * </pre>
  * Additional client configuration options are available.  See the
  * {@code BOSHClientConfig.Builder} class for more information.
- * <p/>
+ * <p>
  * Once a {@code BOSHClient} instance has been created, communication with
  * the remote connection manager can begin.  No attempt will be made to
  * establish a connection to the connection manager until the first call
@@ -61,12 +61,13 @@ import org.igniterealtime.jbosh.ComposableBody.Builder;
  * possible to send an empty body to cause an immediate connection attempt
  * to the connection manager.  Sending an empty message would look like
  * the following:
+ * </p>
  * <pre>
  * client.send(ComposableBody.builder().build());
  * </pre>
  * For more information on creating body messages with content, see the
  * {@code ComposableBody.Builder} class documentation.
- * <p/>
+ * <p>
  * Once a session has been successfully started, the client instance can be
  * used to send arbitrary payload data.  All aspects of the BOSH
  * protocol involving setting and processing attributes in the BOSH
@@ -74,20 +75,22 @@ import org.igniterealtime.jbosh.ComposableBody.Builder;
  * scenes.  The user of the client instance can therefore concentrate
  * entirely on the content of the message payload, leaving the semantics of
  * the BOSH protocol to the client implementation.
- * <p/>
+ * </p>
+ * <p>
  * To be notified of incoming messages from the remote connection manager,
  * a {@code BOSHClientResponseListener} should be added to the client instance.
  * All incoming messages will be published to all response listeners as they
  * arrive and are processed.  As with the transmission of payload data via
  * the {@code send(ComposableBody)} method, there is no need to worry about
  * handling of the BOSH attributes, since this is handled behind the scenes.
- * <p/>
+ * </p>
+ * <p>
  * If the connection to the remote connection manager is terminated (either
  * explicitly or due to a terminal condition of some sort), all connection
  * listeners will be notified.  After the connection has been closed, the
  * client instance is considered dead and a new one must be created in order
  * to resume communications with the remote server.
- * <p/>
+ * </p>
  * Instances of this class are thread-safe.
  *
  * @see BOSHClientConfig.Builder
@@ -265,7 +268,7 @@ public final class BOSHClient {
     /**
      * Future for sending a deferred empty request, if needed.
      */
-    private ScheduledFuture emptyRequestFuture;
+    private ScheduledFuture<?> emptyRequestFuture;
 
     /**
      * Connection Manager session parameters.  Only available when in a
@@ -463,13 +466,14 @@ public final class BOSHClient {
      * provided message body does not need to have any BOSH-specific attribute
      * information set.  It only needs to contain the actual message payload
      * that should be delivered to the remote server.
-     * <p/>
+     * <p>
      * The first call to this method will result in a connection attempt
      * to the remote connection manager.  Subsequent calls to this method
      * will block until the underlying session state allows for the message
      * to be transmitted.  In certain scenarios - such as when the maximum
      * number of outbound connections has been reached - calls to this method
      * will block for short periods of time.
+     * </p>
      *
      * @param body message data to send to remote server
      * @throws BOSHException on message transmission failure

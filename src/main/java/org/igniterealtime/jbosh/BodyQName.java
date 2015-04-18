@@ -22,8 +22,9 @@ import javax.xml.namespace.QName;
  * Qualified name of an attribute of the wrapper element.  This class is
  * analagous to the {@code javax.xml.namespace.QName} class.
  * Each qualified name consists of a namespace URI and a local name.
- * <p/>
+ * <p>
  * Instances of this class are immutable and thread-safe.
+ * </p>
  */
 public final class BodyQName {
 

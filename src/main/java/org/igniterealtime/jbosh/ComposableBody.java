@@ -27,29 +27,34 @@ import javax.xml.XMLConstants;
 /**
  * Implementation of the {@code AbstractBody} class which allows for the
  * definition of  messages from individual elements of a body.
- * <p/>
+ * <p>
  * A message is constructed by creating a builder, manipulating the
  * configuration of the builder, and then building it into a class instance,
  * as in the following example:
  * <pre>
+ * {@code
  * ComposableBody body = ComposableBody.builder()
  *     .setNamespaceDefinition("foo", "http://foo.com/bar")
  *     .setPayloadXML("<foo:data>Data to send to remote server</foo:data>")
  *     .build();
+ * }
  * </pre>
  * Class instances can also be "rebuilt", allowing them to be used as templates
  * when building many similar messages:
  * <pre>
+ * {@code
  * ComposableBody body2 = body.rebuild()
  *     .setPayloadXML("<foo:data>More data to send</foo:data>")
  *     .build();
+ * }
  * </pre>
  * This class does only minimal syntactic and semantic checking with respect
  * to what the generated XML will look like.  It is up to the developer to
  * protect against the definition of malformed XML messages when building
  * instances of this class.
- * <p/>
+ * <p>
  * Instances of this class are immutable and thread-safe.
+ * </p>
  */
 public final class ComposableBody extends AbstractBody {
 
@@ -81,8 +86,9 @@ public final class ComposableBody extends AbstractBody {
      * Class instance builder, after the builder pattern.  This allows each
      * message instance to be immutable while providing flexibility when
      * building new messages.
-     * <p/>
+     * <p>
      * Instances of this class are <b>not</b> thread-safe.
+     * </p>
      */
     public static final class Builder {
         private Map<BodyQName, String> map;

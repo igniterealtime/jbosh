@@ -16,6 +16,8 @@
 
 package org.igniterealtime.jbosh;
 
+import static org.junit.Assert.fail;
+
 import java.util.HashSet;
 import java.util.Set;
 import java.util.logging.Logger;
@@ -26,8 +28,6 @@ import org.igniterealtime.jbosh.BOSHClient;
 import org.igniterealtime.jbosh.BOSHClientConfig;
 import org.igniterealtime.jbosh.ComposableBody;
 import org.junit.Test;
-
-import static junit.framework.Assert.*;
 
 /**
  * BOSH XEP-0124 specification section 19 tests:  Security Considerations.

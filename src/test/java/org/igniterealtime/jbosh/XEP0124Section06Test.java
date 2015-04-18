@@ -16,6 +16,8 @@
 
 package org.igniterealtime.jbosh;
 
+import static org.junit.Assert.fail;
+
 import java.util.logging.Logger;
 
 import org.igniterealtime.jbosh.AbstractBody;
@@ -23,8 +25,6 @@ import org.igniterealtime.jbosh.Attributes;
 import org.igniterealtime.jbosh.ComposableBody;
 import org.igniterealtime.jbosh.StaticBody;
 import org.junit.Test;
-
-import static junit.framework.Assert.*;
 
 /**
  * BOSH XEP-0124 specification section 6 tests:  &lt;body/&gt; Wrapper Element.

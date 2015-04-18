@@ -22,24 +22,11 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpVersion;
 import org.apache.http.client.HttpClient;
-import org.apache.http.conn.ClientConnectionManager;
-import org.apache.http.conn.params.ConnManagerParams;
-import org.apache.http.conn.params.ConnRoutePNames;
-import org.apache.http.conn.scheme.PlainSocketFactory;
-import org.apache.http.conn.scheme.Scheme;
-import org.apache.http.conn.scheme.SchemeRegistry;
-import org.apache.http.conn.ssl.SSLSocketFactory;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
-import org.apache.http.params.BasicHttpParams;
-import org.apache.http.params.HttpParams;
-import org.apache.http.params.HttpProtocolParams;
 
 /**
  * Implementation of the {@code HTTPSender} interface which uses the
  * Apache HttpClient API to send messages to the connection manager.
  */
-@SuppressWarnings("deprecation")
 final class ApacheHTTPSender implements HTTPSender {
 
     /**
@@ -87,6 +74,7 @@ final class ApacheHTTPSender implements HTTPSender {
     /**
      * {@inheritDoc}
      */
+    @SuppressWarnings("deprecation")
     public void destroy() {
         lock.lock();
         try {
@@ -124,34 +112,35 @@ final class ApacheHTTPSender implements HTTPSender {
     ///////////////////////////////////////////////////////////////////////////
     // Package-private methods:
 
-    private synchronized HttpClient initHttpClient(final BOSHClientConfig config) {
+    @SuppressWarnings("deprecation")
+    private static synchronized HttpClient initHttpClient(final BOSHClientConfig config) {
         // Create and initialize HTTP parameters
-        HttpParams params = new BasicHttpParams();
-        ConnManagerParams.setMaxTotalConnections(params, 100);
-        HttpProtocolParams.setVersion(params, HttpVersion.HTTP_1_1);
-        HttpProtocolParams.setUseExpectContinue(params, false);
+        org.apache.http.params.HttpParams params = new org.apache.http.params.BasicHttpParams();
+        org.apache.http.conn.params.ConnManagerParams.setMaxTotalConnections(params, 100);
+        org.apache.http.params.HttpProtocolParams.setVersion(params, HttpVersion.HTTP_1_1);
+        org.apache.http.params.HttpProtocolParams.setUseExpectContinue(params, false);
         if (config != null &&
                 config.getProxyHost() != null &&
                 config.getProxyPort() != 0) {
             HttpHost proxy = new HttpHost(
                     config.getProxyHost(),
                     config.getProxyPort());
-            params.setParameter(ConnRoutePNames.DEFAULT_PROXY, proxy);
+            params.setParameter(org.apache.http.conn.params.ConnRoutePNames.DEFAULT_PROXY, proxy);
         }
 
         // Create and initialize scheme registry 
-        SchemeRegistry schemeRegistry = new SchemeRegistry();
+        org.apache.http.conn.scheme.SchemeRegistry schemeRegistry = new org.apache.http.conn.scheme.SchemeRegistry();
         schemeRegistry.register(
-                new Scheme("http", PlainSocketFactory.getSocketFactory(), 80));
-            SSLSocketFactory sslFactory = SSLSocketFactory.getSocketFactory();
-            sslFactory.setHostnameVerifier(SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
+                new org.apache.http.conn.scheme.Scheme("http", org.apache.http.conn.scheme.PlainSocketFactory.getSocketFactory(), 80));
+            org.apache.http.conn.ssl.SSLSocketFactory sslFactory = org.apache.http.conn.ssl.SSLSocketFactory.getSocketFactory();
+            sslFactory.setHostnameVerifier(org.apache.http.conn.ssl.SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
             schemeRegistry.register(
-                    new Scheme("https", sslFactory, 443));
+                    new org.apache.http.conn.scheme.Scheme("https", sslFactory, 443));
 
         // Create an HttpClient with the ThreadSafeClientConnManager.
         // This connection manager must be used if more than one thread will
         // be using the HttpClient.
-        ClientConnectionManager cm = new ThreadSafeClientConnManager(params, schemeRegistry);
-        return new DefaultHttpClient(cm, params);
+        org.apache.http.conn.ClientConnectionManager cm = new org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager(params, schemeRegistry);
+        return new org.apache.http.impl.client.DefaultHttpClient(cm, params);
     }
 }

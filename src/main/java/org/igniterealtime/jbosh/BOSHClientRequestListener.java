@@ -20,14 +20,14 @@ package org.igniterealtime.jbosh;
  * Interface used by parties interested in monitoring outbound requests made
  * by the client to the connection manager (CM).  No opportunity is provided
  * to manipulate the outbound request.
- * <p/>
+ * <p>
  * The messages being sent are typically modified copies of the message
  * body provided to the {@code BOSHClient} instance, built from the
  * originally provided message body plus additional BOSH protocol
  * state and information.  Messages may also be sent automatically when the
  * protocol requires it, such as maintaining a minimum number of open
  * connections to the connection manager.
- * <p/>
+ * </p>
  * Listeners are executed by the sending thread immediately prior to
  * message transmission and should not block for any significant amount
  * of time.

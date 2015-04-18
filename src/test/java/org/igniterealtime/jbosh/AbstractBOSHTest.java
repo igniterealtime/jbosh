@@ -162,7 +162,7 @@ public abstract class AbstractBOSHTest {
      * @param methodName name of the method
      */
     protected void assertMethodExists(
-            final Class clazz,
+            final Class<?> clazz,
             final String methodName) {
         for (Method method : clazz.getDeclaredMethods()) {
             if (method.getName().equals(methodName)) {
@@ -182,7 +182,7 @@ public abstract class AbstractBOSHTest {
      * @param clazz class that tests the implied condition
      * @param methodName name of the method that performs the test
      */
-    protected void testedBy(final Class clazz, final String methodName) {
+    protected void testedBy(final Class<?> clazz, final String methodName) {
         assertMethodExists(clazz, methodName);
     }
 

@@ -16,13 +16,15 @@
 
 package org.igniterealtime.jbosh;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+
 import org.igniterealtime.jbosh.AbstractBody;
 import org.igniterealtime.jbosh.Attributes;
 import org.igniterealtime.jbosh.BOSHClientConfig;
 import org.igniterealtime.jbosh.ComposableBody;
 import org.junit.Test;
-
-import static junit.framework.Assert.*;
 
 /**
  * BOSH XEP-0124 specification section 7 tests:  Initiating a BOSH Session.

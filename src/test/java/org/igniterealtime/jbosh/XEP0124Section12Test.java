@@ -16,6 +16,11 @@
 
 package org.igniterealtime.jbosh;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
@@ -25,8 +30,6 @@ import org.igniterealtime.jbosh.Attributes;
 import org.igniterealtime.jbosh.CMSessionParams;
 import org.igniterealtime.jbosh.ComposableBody;
 import org.junit.Test;
-
-import static junit.framework.Assert.*;
 
 /**
  * BOSH XEP-0124 specification section 12 tests:  Polling Sessions.

@@ -27,8 +27,8 @@
  *
  * @param <T> type of the extension object
  */
-abstract class AbstractAttr<T extends Comparable>
-    implements Comparable {
+abstract class AbstractAttr<T extends Comparable<T>>
+    implements Comparable<AbstractAttr<T>> {
 
     /**
      * Captured value.
@@ -67,8 +67,9 @@ abstract class AbstractAttr<T extends Comparable>
         if (otherObj == null) {
             return false;
         } else if (otherObj instanceof AbstractAttr) {
-            AbstractAttr other =
-                    (AbstractAttr) otherObj;
+            @SuppressWarnings("unchecked")
+            AbstractAttr<T> other =
+                    (AbstractAttr<T>) otherObj;
             return value.equals(other.value);
         } else {
             return false;
@@ -104,12 +105,12 @@ abstract class AbstractAttr<T extends Comparable>
      * @param otherObj object to compare to
      * @return -1, 0, or 1
      */
-    @SuppressWarnings("unchecked")
-    public int compareTo(final Object otherObj) {
+    @Override
+    public int compareTo(final AbstractAttr<T> otherObj) {
         if (otherObj == null) {
             return 1;
         } else {
-            return value.compareTo(otherObj);
+            return value.compareTo(otherObj.value);
         }
     }
 

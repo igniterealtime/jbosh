@@ -95,7 +95,7 @@ final class ServiceLib {
      * @return list of all declared implementation class names
      */
     private static List<String> loadServicesImplementations(
-            final Class ofClass) {
+            final Class<?> ofClass) {
         List<String> result = new ArrayList<String>();
 
         // Allow a sysprop to specify the first candidate
@@ -155,7 +155,7 @@ final class ServiceLib {
         Level level;
         Throwable thrown;
         try {
-            Class clazz = Class.forName(className);
+            Class<?> clazz = Class.forName(className);
             if (!ofClass.isAssignableFrom(clazz)) {
                 if (LOG.isLoggable(Level.WARNING)) {
                     LOG.warning(clazz.getName() + " is not assignable to "

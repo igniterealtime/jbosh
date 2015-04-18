@@ -136,7 +136,6 @@ public class BOSHClientTest extends AbstractBOSHTest {
     }
 
     @Test(timeout=10000)
-    @SuppressWarnings({"unchecked", "unchecked"})
     public void concurrentSends() throws Exception {
         logTestStart();
 
@@ -154,21 +153,21 @@ public class BOSHClientTest extends AbstractBOSHTest {
         final int messageCount = 50;
 
         // Configure concurrent threads
-        final SynchronousQueue[] queues = new SynchronousQueue[threadCount];
+        final List<SynchronousQueue<AtomicInteger>> queues = new ArrayList<SynchronousQueue<AtomicInteger>>(threadCount);
         final Thread[] threads = new Thread[threadCount];
         final CyclicBarrier barrier = new CyclicBarrier(2);
         for (int idx=0; idx<threadCount; idx++) {
             final int id = idx;
             final int nextID = (id + 1) % threadCount;
-            queues[idx] = new SynchronousQueue();
+            queues.add(idx, new SynchronousQueue<AtomicInteger>());
             threads[idx] = new Thread() {
                 @Override
                 public void run() {
-                    SynchronousQueue queue = queues[id];
+                    SynchronousQueue<AtomicInteger> queue = queues.get(id);
                     try {
                         boolean working = true;
                         do {
-                            AtomicInteger aInt = (AtomicInteger) queue.take();
+                            AtomicInteger aInt = queue.take();
                             int val = aInt.getAndIncrement();
                             if (val < messageCount) {
                                 LOG.finest(id + " sending message " + val);
@@ -192,7 +191,7 @@ public class BOSHClientTest extends AbstractBOSHTest {
                             }
 
                             // handoff to the next thread
-                            if (!queues[nextID].offer(aInt)) {
+                            if (!queues.get(nextID).offer(aInt)) {
                                 LOG.info("Last thread reached");
                             }
                         } while(working);
@@ -214,7 +213,7 @@ public class BOSHClientTest extends AbstractBOSHTest {
         }
 
         // Send message sequence
-        queues[0].put(new AtomicInteger());
+        queues.get(0).put(new AtomicInteger());
         LOG.info("Controller waiting");
         barrier.await();
         LOG.info("Controller continuing");

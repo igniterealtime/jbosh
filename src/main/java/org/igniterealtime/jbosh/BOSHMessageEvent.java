@@ -20,8 +20,9 @@ import java.util.EventObject;
 
 /**
  * Event representing a message sent to or from a BOSH connection manager.
- * <p/>
+ * <p>
  * This class is immutable and thread-safe.
+ * </p>
  */
 public final class BOSHMessageEvent extends EventObject {
 

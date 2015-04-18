@@ -16,6 +16,9 @@
 
 package org.igniterealtime.jbosh;
 
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.fail;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -26,8 +29,6 @@ import org.igniterealtime.jbosh.BOSHException;
 import org.igniterealtime.jbosh.BodyQName;
 import org.igniterealtime.jbosh.ComposableBody;
 import org.junit.Test;
-
-import static junit.framework.Assert.*;
 
 /**
  * BOSH XEP-0124 specification section 5 tests:  HTTP Overview.

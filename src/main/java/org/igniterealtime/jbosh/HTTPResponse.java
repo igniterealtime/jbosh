@@ -38,6 +38,7 @@ interface HTTPResponse {
      *
      * @return HTTP status code
      * @throws InterruptedException if interrupted while awaiting response
+     * @throws BOSHException if there is a BOSH error.
      */
     int getHTTPStatus() throws InterruptedException, BOSHException;
 
@@ -48,6 +49,7 @@ interface HTTPResponse {
      *
      * @return response message body
      * @throws InterruptedException if interrupted while awaiting response
+     * @throws BOSHException if there is a BOSH error.
      */
     AbstractBody getBody() throws InterruptedException, BOSHException;
     

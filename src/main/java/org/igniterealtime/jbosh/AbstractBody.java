@@ -23,13 +23,13 @@ import java.util.Set;
 /**
  * Class representing a single message to or from the BOSH connection
  * manager (CM).
- * <p/>
+ * <p>
  * These messages consist of a single {@code body} element
  * (qualified within the BOSH namespace:
  * {@code http://jabber.org/protocol/httpbind}) and contain zero or more
  * child elements (of any namespace).  These child elements constitute the
  * message payload.
- * <p/>
+ * </p>
  * In addition to the message payload, the attributes of the wrapper
  * {@code body} element may also need to be used as part of the communication
  * protocol being implemented on top of BOSH, or to define additional
