@@ -16,6 +16,12 @@
 
 package org.igniterealtime.jbosh;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.igniterealtime.jbosh.AbstractBody;
@@ -26,8 +32,6 @@ import org.igniterealtime.jbosh.HTTPExchange;
 import org.igniterealtime.jbosh.BOSHClient.ExchangeInterceptor;
 import org.junit.Ignore;
 import org.junit.Test;
-
-import static junit.framework.Assert.*;
 
 /**
  * BOSH XEP-0124 specification section 9 tests:  Acknowledgements.

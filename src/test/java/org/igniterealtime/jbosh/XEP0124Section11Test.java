@@ -16,6 +16,12 @@
 
 package org.igniterealtime.jbosh;
 
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -31,8 +37,6 @@ import org.igniterealtime.jbosh.ComposableBody;
 import org.igniterealtime.jbosh.TerminalBindingCondition;
 import org.junit.Ignore;
 import org.junit.Test;
-
-import static junit.framework.Assert.*;
 
 /**
  * BOSH XEP-0124 specification section 11 tests:  Overactivity.

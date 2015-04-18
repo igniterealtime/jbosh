@@ -20,7 +20,7 @@ package org.igniterealtime.jbosh;
  * Data type representing the getValue of the {@code ver} attribute of the
  * {@code bosh} element.
  */
-final class AttrVersion extends AbstractAttr<String> implements Comparable {
+final class AttrVersion extends AbstractAttr<String> {
 
     /**
      * Default value if none is provided.
@@ -143,7 +143,7 @@ final class AttrVersion extends AbstractAttr<String> implements Comparable {
      * @return -1, 0, or 1
      */
     @Override
-    public int compareTo(final Object otherObj) {
+    public int compareTo(final AbstractAttr<String> otherObj) {
         if (otherObj instanceof AttrVersion) {
             AttrVersion other = (AttrVersion) otherObj;
             if (major < other.major) {

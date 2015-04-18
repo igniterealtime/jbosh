@@ -16,6 +16,12 @@
 
 package org.igniterealtime.jbosh;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
 
@@ -25,8 +31,6 @@ import org.igniterealtime.jbosh.BOSHClientRequestListener;
 import org.igniterealtime.jbosh.BOSHMessageEvent;
 import org.igniterealtime.jbosh.ComposableBody;
 import org.junit.Test;
-
-import static junit.framework.Assert.*;
 
 /**
  * BOSH XEP-0124 specification section 10 tests:  Inactivity.

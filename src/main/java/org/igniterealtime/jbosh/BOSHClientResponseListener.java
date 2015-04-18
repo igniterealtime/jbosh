@@ -20,9 +20,10 @@ package org.igniterealtime.jbosh;
  * Interface used by parties interested in monitoring inbound responses
  * to the client from the connection manager (CM).  No opportunity is provided
  * to manipulate the response.
- * <p/>
+ * <p>
  * Listeners are executed by the message processing thread and should not
  * block for any significant amount of time.
+ * </p>
  */
 public interface BOSHClientResponseListener {
 

@@ -23,9 +23,10 @@ import javax.net.ssl.SSLContext;
  * BOSH client configuration information.  Instances of this class contain
  * all information necessary to establish connectivity with a remote
  * connection manager.
- * <p/>
+ * <p>
  * Instances of this class are immutable, thread-safe,
  * and can be re-used to configure multiple client session instances.
+ * </p>
  */
 public final class BOSHClientConfig {
 
@@ -81,9 +82,10 @@ public final class BOSHClientConfig {
      * Class instance builder, after the builder pattern.  This allows each
      * {@code BOSHClientConfig} instance to be immutable while providing
      * flexibility when building new {@code BOSHClientConfig} instances.
-     * <p/>
+     * <p>
      * Instances of this class are <b>not</b> thread-safe.  If template-style
      * use is desired, see the {@code create(BOSHClientConfig)} method.
+     * </p>
      */
     public static final class Builder {
         // Required args

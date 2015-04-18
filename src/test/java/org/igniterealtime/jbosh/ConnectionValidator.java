@@ -55,8 +55,8 @@ public final class ConnectionValidator implements StubCMListener {
             new AtomicReference<Error>();
     private final AtomicReference<BOSHClient> client =
             new AtomicReference<BOSHClient>();
-    private final AtomicReference<ScheduledFuture> inactivityRef =
-            new AtomicReference<ScheduledFuture>();
+    private final AtomicReference<ScheduledFuture<?>> inactivityRef =
+            new AtomicReference<ScheduledFuture<?>>();
     private final ScheduledExecutorService schedExec =
             Executors.newSingleThreadScheduledExecutor();
 
@@ -331,7 +331,7 @@ public final class ConnectionValidator implements StubCMListener {
      */
     private void cancelInactivityCheck() {
         // Disregard any pending checks - we're shutting down
-        ScheduledFuture checker = inactivityRef.getAndSet(null);
+        ScheduledFuture<?> checker = inactivityRef.getAndSet(null);
         if (checker != null) {
             LOG.finest("Inactivity timer canceled");
             checker.cancel(true);

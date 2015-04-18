@@ -23,8 +23,9 @@ import java.util.List;
 
 /**
  * Client connection event, notifying of changes in connection state.
- * <p/>
+ * <p>
  * This class is immutable and thread-safe.
+ * </p>
  */
 public final class BOSHClientConnEvent extends EventObject {
 
