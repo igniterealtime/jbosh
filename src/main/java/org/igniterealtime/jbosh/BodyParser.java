@@ -21,7 +21,7 @@ package org.igniterealtime.jbosh;
  * business of XML parsing out of the Body class.  This allows us to leverage
  * a variety of parser implementations to gain performance advantages.
  */
-interface BodyParser {
+public interface BodyParser {
 
     /**
      * Parses the XML message, extracting the useful data from the initial

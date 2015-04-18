@@ -20,7 +20,7 @@ package org.igniterealtime.jbosh;
  * Interface used to represent code which can send a BOSH XML body over
  * HTTP to a connection manager.
  */
-interface HTTPSender {
+public interface HTTPSender {
 
     /**
      * Initialize the HTTP sender instance for use with the session provided.

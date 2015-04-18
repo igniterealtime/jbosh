@@ -22,7 +22,7 @@ package org.igniterealtime.jbosh;
  * intended to represent a deferred, future response, not necessarily a
  * response which is immediately available.
  */
-interface HTTPResponse {
+public interface HTTPResponse {
 
     /**
      * Close out any resources still held by the original request.  The
