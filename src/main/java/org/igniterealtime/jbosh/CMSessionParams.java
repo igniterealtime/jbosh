@@ -21,7 +21,7 @@ package org.igniterealtime.jbosh;
  * configuration knowledge related to the CM session and provides a
  * mechanism by which
  */
-final class CMSessionParams {
+public final class CMSessionParams {
 
     private final AttrSessionID sid;
 
