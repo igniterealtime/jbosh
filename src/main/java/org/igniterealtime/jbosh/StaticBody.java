@@ -28,15 +28,15 @@ import java.util.Map;
  * this class are based on the underlying data and therefore cannot be
  * modified.  In order to obtain the wrapper element namespace and
  * attribute information, the body content is partially parsed.
- * <p/>
+ * <p>
  * This class does only minimal syntactic and semantic checking with respect
  * to what the generated XML will look like.  It is up to the developer to
  * protect against the definition of malformed XML messages when building
  * instances of this class.
- * <p/>
+ * </p>
  * Instances of this class are immutable and thread-safe.
  */
-final class StaticBody extends AbstractBody {
+public final class StaticBody extends AbstractBody {
 
     /**
      * Selected parser to be used to process raw XML messages.
