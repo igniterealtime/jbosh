@@ -30,7 +30,7 @@ final class AttrWait extends AbstractIntegerAttr {
      */
     private AttrWait(final String val) throws BOSHException {
         super(val);
-        checkMinValue(1);
+        checkMinValue(0);
     }
 
     /**
