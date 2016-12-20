@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -160,6 +159,11 @@ public final class BOSHClient {
             DEFAULT_PAUSE_MARGIN);
     
     /**
+     * Default number of request processor threads.
+     */
+    private static final int DEFAULT_REQ_PROC_COUNT = 1;
+
+    /**
      * Flag indicating whether or not we want to perform assertions.
      */
     private static final boolean ASSERTIONS;
@@ -211,18 +215,6 @@ public final class BOSHClient {
     /**
      * Processor thread runnable instance.
      */
-    private final Runnable procRunnable = new Runnable() {
-        /**
-         * Process incoming messages.
-         */
-        public void run() {
-            processMessages();
-        }
-    };
-
-    /**
-     * Processor thread runnable instance.
-     */
     private final Runnable emptyRequestRunnable = new Runnable() {
         /**
          * Process incoming messages.
@@ -260,10 +252,11 @@ public final class BOSHClient {
      */
 
     /**
-     * Thread which is used to process responses from the connection
-     * manager.  Becomes null when session is terminated.
+     * An array of <tt>RequestProcessor</tt> which represents a Thread which is
+     * used to process responses from the connection manager.  Becomes null when
+     * session is terminated.
      */
-    private Thread procThread;
+    private RequestProcessor[] procThreads;
 
     /**
      * Future for sending a deferred empty request, if needed.
@@ -279,7 +272,7 @@ public final class BOSHClient {
     /**
      * List of active/outstanding requests.
      */
-    private Queue<HTTPExchange> exchanges = new LinkedList<HTTPExchange>();
+    private LinkedList<HTTPExchange> exchanges = new LinkedList<HTTPExchange>();
 
     /**
      * Set of RIDs which have been received, for the purpose of sending
@@ -509,7 +502,7 @@ public final class BOSHClient {
             }
             exch = new HTTPExchange(request);
             exchanges.add(exch);
-            notEmpty.signalAll();
+            notEmpty.signal();
             clearEmptyRequest();
         } finally {
             lock.unlock();
@@ -666,12 +659,18 @@ public final class BOSHClient {
         lock.lock();
         try {
             httpSender.init(cfg);
-            procThread = new Thread(procRunnable);
-            procThread.setDaemon(true);
-            procThread.setName(BOSHClient.class.getSimpleName()
-                    + "[" + System.identityHashCode(this)
-                    + "]: Receive thread");
-            procThread.start();
+
+            LOG.info(
+                "Starting with "
+                    + DEFAULT_REQ_PROC_COUNT + " request processors");
+
+            procThreads = new RequestProcessor[DEFAULT_REQ_PROC_COUNT];
+
+            for (int i = 0; i < procThreads.length; i++) {
+                procThreads[i] = new RequestProcessor(i);
+                procThreads[i].start();
+            }
+
         } finally {
             lock.unlock();
         }
@@ -688,11 +687,14 @@ public final class BOSHClient {
         
         lock.lock();
         try {
-            if (procThread == null) {
+            if (procThreads == null) {
                 // Already disposed
                 return;
             }
-            procThread = null;
+            for (RequestProcessor processor : procThreads) {
+                processor.dispose();
+            }
+            procThreads = null;
         } finally {
             lock.unlock();
         }
@@ -810,7 +812,7 @@ public final class BOSHClient {
     private boolean isWorking() {
         assertLocked();
 
-        return procThread != null;
+        return procThreads != null;
     }
 
     /**
@@ -848,6 +850,10 @@ public final class BOSHClient {
         builder.setAttribute(Attributes.XML_LANG, cfg.getLang());
         builder.setAttribute(Attributes.VER,
                 AttrVersion.getSupportedVersion().toString());
+        // NOTE: when WAIT is set to 60, HOLD is set to 1 and the CM replies
+        // with REQ = 1 then the connection can end up stuck up to 60 seconds
+        // if empty request is sent and there is no incoming traffic during that
+        // time.
         builder.setAttribute(Attributes.WAIT, "60");
         builder.setAttribute(Attributes.HOLD, "1");
         builder.setAttribute(Attributes.RID, Long.toString(rid));
@@ -947,13 +953,16 @@ public final class BOSHClient {
      * While we are "connected", process received responses.
      *
      * This method is run in the processing thread.
+     *
+     * @param idx the {@link #procThreads} index of the "RequestProcessor"
+     *  for which this method is executed.
      */
-    private void processMessages() {
-        LOG.log(Level.FINEST, "Processing thread starting");
+    private void processMessages(int idx) {
+        LOG.finest("Processing thread " + idx + " starting...");
         try {
             HTTPExchange exch;
             do {
-                exch = nextExchange();
+                exch = nextExchange(idx);
                 if (exch == null) {
                     break;
                 }
@@ -978,10 +987,10 @@ public final class BOSHClient {
                     exch = newExch;
                 }
 
-                processExchange(exch);
+                processExchange(idx, exch);
             } while (true);
         } finally {
-            LOG.log(Level.FINEST, "Processing thread exiting");
+            LOG.log(Level.FINEST, "Processing thread exiting: " + idx);
         }
 
     }
@@ -990,10 +999,13 @@ public final class BOSHClient {
      * Get the next message exchange to process, blocking until one becomes
      * available if nothing is already waiting for processing.
      *
+     * @param idx the {@link #procThreads} index of the "RequestProcessor"
+     *  for which this method is executed.
+     *
      * @return next available exchange to process, or {@code null} if no
      *  exchanges are immediately available
      */
-    private HTTPExchange nextExchange() {
+    private HTTPExchange nextExchange(int idx) {
         assertUnlocked();
 
         final Thread thread = Thread.currentThread();
@@ -1001,10 +1013,11 @@ public final class BOSHClient {
         lock.lock();
         try {
             do {
-                if (!thread.equals(procThread)) {
+                if (procThreads == null
+                        || !thread.equals(procThreads[idx].procThread)) {
                     break;
                 }
-                exch = exchanges.peek();
+                exch = claimExchange(idx);
                 if (exch == null) {
                     try {
                         notEmpty.await();
@@ -1020,21 +1033,97 @@ public final class BOSHClient {
     }
 
     /**
+     * Finds and claims the exchange that has not been taken by other request
+     * processor.
+     *
+     * @param idx the {@link #procThreads} index of the "RequestProcessor"
+     *  for which this method is executed.
+     *
+     * @return <tt>HTTPExchange</tt> claimed for
+     *  the <tt>{@link RequestProcessor}</tt> or <tt>null</tt> if there are no
+     *  unclaimed exchanges available at this time.
+     */
+    private HTTPExchange claimExchange(int idx) {
+        assertLocked();
+
+        HTTPExchange exch = null;
+
+        // Claim the exchange
+        for (HTTPExchange toClaim : exchanges) {
+            if (findProcessorForExchange(toClaim) == null) {
+                exch = toClaim;
+                break;
+            }
+        }
+
+        if (exch != null) {
+            procThreads[idx].procExchange = exch;
+            if (LOG.isLoggable(Level.FINEST)) {
+                LOG.finest(
+                    "Thread " + idx + " claimed: "
+                        + exch.getRequest().getAttribute(Attributes.RID));
+            }
+        } else {
+            if (LOG.isLoggable(Level.FINEST))
+                LOG.finest("Thread " + idx + " will wait for new request...");
+        }
+
+        return exch;
+    }
+
+    /**
+     * Finds <tt>RequestProcessor</tt> which has claimed given exchange.
+     *
+     * @param exch the <tt>HTTPExchange</tt> for which <tt>RequestProcessor</tt>
+     *  is to be found.
+     *
+     * @return <tt>{@link RequestProcessor}</tt> that has claimed given
+     * <tt>HTTPExchange</tt> or <tt>null</tt> if the exchange has not been
+     * claimed yet.
+     */
+    private RequestProcessor findProcessorForExchange(HTTPExchange exch) {
+        assertLocked();
+
+        for (RequestProcessor reqProc : procThreads) {
+            if (exch == reqProc.procExchange)
+                return reqProc;
+        }
+
+        return null;
+    }
+
+    /**
      * Process the next, provided exchange.  This is the main processing
      * method of the receive thread.
      *
      * @param exch message exchange to process
      */
-    private void processExchange(final HTTPExchange exch) {
+    private void processExchange(final int idx, final HTTPExchange exch) {
         assertUnlocked();
 
         HTTPResponse resp;
         AbstractBody body;
         int respCode;
         try {
+            if (LOG.isLoggable(Level.FINEST))
+                LOG.finest(
+                    "Thread " + idx + " is sending "
+                        + exch.getRequest().getAttribute(Attributes.RID));
+
             resp = exch.getHTTPResponse();
             body = resp.getBody();
             respCode = resp.getHTTPStatus();
+
+            if (LOG.isLoggable(Level.FINEST)) {
+                String respRid = body.getAttribute(Attributes.RID);
+                if (respRid == null)
+                    respRid = exch.getRequest().getAttribute(Attributes.RID);
+                LOG.finest(
+                    "Thread " + idx + " received response"
+                        + " for RID: " + respRid
+                        + " code: " + respCode
+                        + " ACK: " + body.getAttribute(Attributes.ACK));
+            }
         } catch (BOSHException boshx) {
             LOG.log(Level.FINEST, "Could not obtain response", boshx);
             dispose(boshx);
@@ -1061,6 +1150,9 @@ public final class BOSHClient {
             if (cmParams == null) {
                 cmParams = CMSessionParams.fromSessionInit(req, body);
 
+                // Adjust number of request processors based on REQ value
+                adjustRequestProcessorsPool();
+
                 // The following call handles the lock. It's not an escape.
                 fireConnectionEstablished();
             }
@@ -1073,7 +1165,8 @@ public final class BOSHClient {
                 dispose(null);
                 return;
             }
-            
+
+            // FIXME this may not work with more than 1 RequestProcessor
             if (isRecoverableBindingCondition(body)) {
                 // Retransmit outstanding requests
                 if (toResend == null) {
@@ -1127,7 +1220,46 @@ public final class BOSHClient {
             }
         }
     }
-    
+
+    /**
+     * Checks the value of REQ attribute received from the CM and adjusts
+     * the size of the request processors pool.
+     */
+    private void adjustRequestProcessorsPool()
+    {
+        assertLocked();
+
+        AttrRequests attrRequests = cmParams.getRequests();
+
+        int requests
+            = attrRequests != null
+                ? attrRequests.intValue() : 2;
+
+        // NOTE In polling mode with default WAIT=60 connection
+        //      will be unresponsive
+        if (requests <= 1 && "1".equals(String.valueOf(cmParams.getHold()))) {
+            LOG.warning(
+                "CM supports only 1 requests at a time and there is"
+                    + " a risk of connection being stuck up to "
+                    + cmParams.getWait() + "seconds");
+        }
+
+        // Expand request processors pool
+        if (requests > procThreads.length) {
+
+            RequestProcessor[] oldProcessors = procThreads;
+            procThreads = new RequestProcessor[requests];
+
+            System.arraycopy(
+                oldProcessors, 0, procThreads, 0, oldProcessors.length);
+
+            for (int i = oldProcessors.length; i < requests; i++) {
+                procThreads[i] = new RequestProcessor(i);
+                procThreads[i].start();
+            }
+        }
+    }
+
     /**
      * Clears any scheduled empty requests.
      */
@@ -1148,14 +1280,17 @@ public final class BOSHClient {
      */
     private long getDefaultEmptyRequestDelay() {
         assertLocked();
-        
+
         // Figure out how long we should wait before sending an empty request
-        AttrPolling polling = cmParams.getPollingInterval();
-        long delay;
-        if (polling == null) {
-            delay = EMPTY_REQUEST_DELAY;
-        } else {
-            delay = polling.getInMilliseconds();
+        AttrRequests requests = cmParams.getRequests();
+        long delay = EMPTY_REQUEST_DELAY;
+
+        // Polling mode is used when REQ = 1, HOLD should be set to 0
+        if (requests == null || requests.intValue() <= 1) {
+            AttrPolling polling = cmParams.getPollingInterval();
+            if (polling != null) {
+                delay = polling.getInMilliseconds();
+            }
         }
         return delay;
     }
@@ -1421,7 +1556,7 @@ public final class BOSHClient {
         // Resend the missing request
         HTTPExchange exch = new HTTPExchange(req);
         exchanges.add(exch);
-        notEmpty.signalAll();
+        notEmpty.signal();
         return exch;
     }
 
@@ -1544,4 +1679,65 @@ public final class BOSHClient {
         }
     }
 
+    /**
+     * Class represents a request processing thread. Each thread will claim
+     * exchange for processing in {@link #claimExchange(int)} and send
+     * the request. The number of processing threads is adjusted based on
+     * the value of {@link AttrRequests} in
+     * {@link #adjustRequestProcessorsPool()}, after it is received from the CM.
+     */
+    private class RequestProcessor implements Runnable {
+
+        /**
+         * The index of request processor which identifies it's place in
+         * the {@link #procThreads} array.
+         */
+        private final int idx;
+
+        /**
+         * The <tt>Thread</tt> which runs this request processor.
+         */
+        private Thread procThread;
+
+        /**
+         * The exchange claimed by this processor.
+         */
+        private HTTPExchange procExchange;
+
+        /**
+         * Creates new <tt>RequestProcessor</tt>.
+         *
+         * @param idx the request processor's index in
+         *  the {@link #procThreads} array.
+         */
+        RequestProcessor(int idx) {
+            this.idx = idx;
+        }
+
+        @Override
+        public void run() {
+            processMessages(idx);
+        }
+
+        /**
+         * Creates and starts a new <tt>Thread</tt> for this processor.
+         */
+        void start() {
+            procThread = new Thread(this);
+            procThread.setDaemon(true);
+            procThread.setName(RequestProcessor.class.getSimpleName()
+                + "[" + System.identityHashCode(this)
+                + "]: Receive thread " + idx);
+            procThread.start();
+        }
+
+        /**
+         * Informs this request processor to stop (but the thread may not
+         * terminate immediately).
+         */
+        void dispose() {
+            // The thread should stop
+            procThread = null;
+        }
+    }
 }
