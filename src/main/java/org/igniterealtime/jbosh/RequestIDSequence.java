@@ -87,6 +87,10 @@ final class RequestIDSequence {
         return nextRequestID.getAndIncrement();
     }
 
+    public long getRID() {
+        return nextRequestID.get();
+    }
+
     ///////////////////////////////////////////////////////////////////////////
     // Private methods:
 
