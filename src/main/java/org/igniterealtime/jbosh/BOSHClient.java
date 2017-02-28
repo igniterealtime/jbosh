@@ -859,9 +859,9 @@ public final class BOSHClient {
         builder.setAttribute(Attributes.RID, Long.toString(rid));
         applyRoute(builder);
         applyFrom(builder);
-        // NOTE: waiting for acknowledgment in every packet slows down connection
-        // because it postpones sending every packet until previous ack is received.
-        // it's can be observed especially on mobile device client with 1 processing thread.
+        // NOTE: Using only one thread and waiting for the acknowledgment slows
+        // the connection down because it postpones sending every packet until
+        // previous ack is received.
         if (cfg.isAckEnabled() ) {
             builder.setAttribute(Attributes.ACK, "1");
         }
