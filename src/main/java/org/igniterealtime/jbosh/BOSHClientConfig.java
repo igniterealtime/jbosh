@@ -16,7 +16,11 @@
 
 package org.igniterealtime.jbosh;
 
+import org.apache.http.Header;
+
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 import javax.net.ssl.SSLContext;
 
 /**
@@ -75,8 +79,18 @@ public final class BOSHClientConfig {
      */
     private final boolean compressionEnabled;
 
+    /**
+     * Any additional headers to be sent in the HTTP requests
+     */
+    private List<Header> httpHeaders;
+
     ///////////////////////////////////////////////////////////////////////////
     // Classes:
+
+    public List<Header> getHttpHeaders() {
+        return httpHeaders;
+    }
+
 
     /**
      * Class instance builder, after the builder pattern.  This allows each
@@ -100,6 +114,7 @@ public final class BOSHClientConfig {
         private int bProxyPort;
         private SSLContext bSSLContext;
         private Boolean bCompression;
+        private List<Header> httpHeaders = new ArrayList<>();
 
         /**
          * Creates a new builder instance, used to create instances of the
@@ -279,6 +294,18 @@ public final class BOSHClientConfig {
         }
 
         /**
+         * Any additional headers to be sent in the HTTP requests
+         *
+         * @param additionalHeader to be sent with every request
+         *
+         * @return builder instance
+         */
+        public Builder addHttpHeader(Header additionalHeader) {
+            this.httpHeaders.add(additionalHeader);
+            return this;
+        }
+
+        /**
          * Build the immutable object instance with the current configuration.
          *
          * @return BOSHClientConfig instance
@@ -317,7 +344,8 @@ public final class BOSHClientConfig {
                     bProxyHost,
                     port,
                     bSSLContext,
-                    compression);
+                    compression,
+                    httpHeaders);
         }
 
     }
@@ -347,7 +375,8 @@ public final class BOSHClientConfig {
             final String cProxyHost,
             final int cProxyPort,
             final SSLContext cSSLContext,
-            final boolean cCompression) {
+            final boolean cCompression,
+            final List<Header> cHttpHeaders) {
         uri = cURI;
         to = cDomain;
         from = cFrom;
@@ -357,6 +386,7 @@ public final class BOSHClientConfig {
         proxyPort = cProxyPort;
         sslContext = cSSLContext;
         compressionEnabled = cCompression;
+        httpHeaders = cHttpHeaders;
     }
 
     /**
