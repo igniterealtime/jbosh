@@ -16,12 +16,23 @@
 
 package org.igniterealtime.jbosh;
 
+import org.apache.http.HttpHost;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.config.Registry;
+import org.apache.http.config.RegistryBuilder;
+import org.apache.http.conn.socket.ConnectionSocketFactory;
+import org.apache.http.conn.socket.PlainConnectionSocketFactory;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+
+import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.http.HttpHost;
-import org.apache.http.HttpVersion;
-import org.apache.http.client.HttpClient;
+import javax.net.ssl.SSLContext;
 
 /**
  * Implementation of the {@code HTTPSender} interface which uses the
@@ -112,35 +123,48 @@ final class ApacheHTTPSender implements HTTPSender {
     ///////////////////////////////////////////////////////////////////////////
     // Package-private methods:
 
-    @SuppressWarnings("deprecation")
     private static synchronized HttpClient initHttpClient(final BOSHClientConfig config) {
-        // Create and initialize HTTP parameters
-        org.apache.http.params.HttpParams params = new org.apache.http.params.BasicHttpParams();
-        org.apache.http.conn.params.ConnManagerParams.setMaxTotalConnections(params, 100);
-        org.apache.http.params.HttpProtocolParams.setVersion(params, HttpVersion.HTTP_1_1);
-        org.apache.http.params.HttpProtocolParams.setUseExpectContinue(params, false);
-        if (config != null &&
-                config.getProxyHost() != null &&
+
+        SSLConnectionSocketFactory sslFactory =
+                new SSLConnectionSocketFactory(
+                        getSslContext(config));
+
+        ConnectionSocketFactory csf = PlainConnectionSocketFactory.getSocketFactory();
+
+        Registry<ConnectionSocketFactory> r = RegistryBuilder.<ConnectionSocketFactory>create()
+                .register("http", csf)
+                .register("https", sslFactory)
+                .build();
+
+        PoolingHttpClientConnectionManager cm = new PoolingHttpClientConnectionManager(r);
+        cm.setMaxTotal(100);
+        RequestConfig rc = RequestConfig.custom()
+                .setExpectContinueEnabled(false)
+                .setContentCompressionEnabled(config.isCompressionEnabled())
+                .build();
+        HttpClientBuilder httpClientBuilder = HttpClients.custom()
+                .setConnectionManager(cm)
+                .setDefaultRequestConfig(rc);
+
+        if (config.getProxyHost() != null &&
                 config.getProxyPort() != 0) {
             HttpHost proxy = new HttpHost(
                     config.getProxyHost(),
                     config.getProxyPort());
-            params.setParameter(org.apache.http.conn.params.ConnRoutePNames.DEFAULT_PROXY, proxy);
+            httpClientBuilder.setProxy(proxy);
         }
 
-        // Create and initialize scheme registry 
-        org.apache.http.conn.scheme.SchemeRegistry schemeRegistry = new org.apache.http.conn.scheme.SchemeRegistry();
-        schemeRegistry.register(
-                new org.apache.http.conn.scheme.Scheme("http", org.apache.http.conn.scheme.PlainSocketFactory.getSocketFactory(), 80));
-            org.apache.http.conn.ssl.SSLSocketFactory sslFactory = org.apache.http.conn.ssl.SSLSocketFactory.getSocketFactory();
-            sslFactory.setHostnameVerifier(org.apache.http.conn.ssl.SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
-            schemeRegistry.register(
-                    new org.apache.http.conn.scheme.Scheme("https", sslFactory, 443));
+        return httpClientBuilder.build();
+    }
 
-        // Create an HttpClient with the ThreadSafeClientConnManager.
-        // This connection manager must be used if more than one thread will
-        // be using the HttpClient.
-        org.apache.http.conn.ClientConnectionManager cm = new org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager(params, schemeRegistry);
-        return new org.apache.http.impl.client.DefaultHttpClient(cm, params);
+    private static SSLContext getSslContext(BOSHClientConfig config) {
+        if (config.getSSLContext() != null) {
+            return config.getSSLContext();
+        }
+        try {
+            return SSLContext.getDefault();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
