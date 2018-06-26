@@ -16,7 +16,11 @@
 
 package org.igniterealtime.jbosh;
 
+import org.apache.http.Header;
+
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 import javax.net.ssl.SSLContext;
 
 /**
@@ -84,6 +88,11 @@ public final class BOSHClientConfig {
      */
     private final boolean ack;
 
+    /**
+     * Any additional headers to be sent in the HTTP requests
+     */
+    private List<Header> httpHeaders;
+
     ///////////////////////////////////////////////////////////////////////////
     // Classes:
 
@@ -110,6 +119,7 @@ public final class BOSHClientConfig {
         private SSLContext bSSLContext;
         private Boolean bCompression;
         private boolean ack = true;
+        private List<Header> httpHeaders = new ArrayList<>();
 
         /**
          * Creates a new builder instance, used to create instances of the
@@ -302,6 +312,18 @@ public final class BOSHClientConfig {
         }
 
         /**
+         * Any additional headers to be sent in the HTTP requests
+         *
+         * @param additionalHeader to be sent with every request
+         *
+         * @return builder instance
+         */
+        public Builder addHttpHeader(Header additionalHeader) {
+            this.httpHeaders.add(additionalHeader);
+            return this;
+        }
+
+        /**
          * Build the immutable object instance with the current configuration.
          *
          * @return BOSHClientConfig instance
@@ -341,7 +363,8 @@ public final class BOSHClientConfig {
                     port,
                     bSSLContext,
                     compression,
-                    ack);
+                    ack,
+                    httpHeaders);
         }
 
     }
@@ -372,7 +395,8 @@ public final class BOSHClientConfig {
             final int cProxyPort,
             final SSLContext cSSLContext,
             final boolean cCompression,
-            final boolean useAck) {
+            final boolean useAck,
+            final List<Header> cHttpHeaders) {
         uri = cURI;
         to = cDomain;
         from = cFrom;
@@ -383,6 +407,7 @@ public final class BOSHClientConfig {
         sslContext = cSSLContext;
         compressionEnabled = cCompression;
         ack = useAck;
+        httpHeaders = cHttpHeaders;
     }
 
     /**
@@ -472,5 +497,9 @@ public final class BOSHClientConfig {
     }
 
     public boolean isAckEnabled() { return ack; }
+
+    public List<Header> getHttpHeaders() {
+        return httpHeaders;
+    }
 
 }
