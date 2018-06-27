@@ -132,8 +132,14 @@ final class ApacheHTTPSender implements HTTPSender {
         org.apache.http.conn.scheme.SchemeRegistry schemeRegistry = new org.apache.http.conn.scheme.SchemeRegistry();
         schemeRegistry.register(
                 new org.apache.http.conn.scheme.Scheme("http", org.apache.http.conn.scheme.PlainSocketFactory.getSocketFactory(), 80));
-            org.apache.http.conn.ssl.SSLSocketFactory sslFactory = org.apache.http.conn.ssl.SSLSocketFactory.getSocketFactory();
-            sslFactory.setHostnameVerifier(org.apache.http.conn.ssl.SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
+
+            org.apache.http.conn.ssl.SSLSocketFactory sslFactory;
+            if(null == config.getSSLContext()) {
+                sslFactory = org.apache.http.conn.ssl.SSLSocketFactory.getSocketFactory();
+                sslFactory.setHostnameVerifier(org.apache.http.conn.ssl.SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
+            } else {
+                sslFactory = new org.apache.http.conn.ssl.SSLSocketFactory(config.getSSLContext());
+            }
             schemeRegistry.register(
                     new org.apache.http.conn.scheme.Scheme("https", sslFactory, 443));
 
