@@ -849,7 +849,7 @@ public final class BOSHClient {
         builder.setAttribute(Attributes.TO, cfg.getTo());
         builder.setAttribute(Attributes.XML_LANG, cfg.getLang());
         builder.setAttribute(Attributes.VER,
-                AttrVersion.getSupportedVersion().toString());
+                cfg.getBoshVersion().toString());
         // NOTE: when WAIT is set to 60, HOLD is set to 1 and the CM replies
         // with REQ = 1 then the connection can end up stuck up to 60 seconds
         // if empty request is sent and there is no incoming traffic during that
