@@ -859,7 +859,12 @@ public final class BOSHClient {
         builder.setAttribute(Attributes.RID, Long.toString(rid));
         applyRoute(builder);
         applyFrom(builder);
-        builder.setAttribute(Attributes.ACK, "1");
+        // NOTE: Using only one thread and waiting for the acknowledgment slows
+        // the connection down because it postpones sending every packet until
+        // previous ack is received.
+        if (cfg.isAckEnabled() ) {
+            builder.setAttribute(Attributes.ACK, "1");
+        }
 
         // Make sure the following are NOT present (i.e., during retries)
         builder.setAttribute(Attributes.SID, null);
@@ -915,7 +920,10 @@ public final class BOSHClient {
         builder.setAttribute(Attributes.SID,
                 cmParams.getSessionID().toString());
         builder.setAttribute(Attributes.RID, Long.toString(rid));
-        applyResponseAcknowledgement(builder, rid);
+
+        if(cfg.isAckEnabled()) {
+            applyResponseAcknowledgement(builder, rid);
+        }
         return builder.build();
     }
 

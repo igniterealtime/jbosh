@@ -17,6 +17,8 @@
 package org.igniterealtime.jbosh;
 
 import java.net.URI;
+import java.util.HashMap;
+import java.util.Map;
 import javax.net.ssl.SSLContext;
 
 /**
@@ -75,6 +77,20 @@ public final class BOSHClientConfig {
      */
     private final boolean compressionEnabled;
 
+    /**
+     * Flag indicating that acknowledgements will be using for session.
+     *
+     * According to https://xmpp.org/extensions/xep-0124.html
+     * A client MAY include an 'ack' attribute (set to "1") to indicate that it will be using acknowledgements
+     * throughout the session and that the absence of an 'ack' attribute in any request is meaningful (see Acknowledgements).
+     */
+    private final boolean ack;
+
+    /**
+     * Any additional headers to be sent in the HTTP requests
+     */
+    private Map<String, String> httpHeaders;
+
     ///////////////////////////////////////////////////////////////////////////
     // Classes:
 
@@ -100,6 +116,8 @@ public final class BOSHClientConfig {
         private int bProxyPort;
         private SSLContext bSSLContext;
         private Boolean bCompression;
+        private boolean ack = true;
+        private Map<String, String> httpHeaders = new HashMap<>();
 
         /**
          * Creates a new builder instance, used to create instances of the
@@ -279,6 +297,32 @@ public final class BOSHClientConfig {
         }
 
         /**
+         * Set whether or not acknowledgements throughout the session
+         * should be enabled.  By default, acknowledgement is enabled.
+         *
+         * @param enabled set to {@code true} if an acknowledgements throughout the session
+         * should be using
+         * @return builder instance
+         */
+        public Builder setAckEnabled(boolean enabled) {
+            ack = enabled;
+            return this;
+        }
+
+        /**
+         * Any additional headers to be sent in the HTTP requests
+         *
+         * @param name of header to be sent with every request
+         * @param value of header to be sent with every request
+         *
+         * @return builder instance
+         */
+        public Builder addHttpHeader(String name, String value) {
+            this.httpHeaders.put(name, value);
+            return this;
+        }
+
+        /**
          * Build the immutable object instance with the current configuration.
          *
          * @return BOSHClientConfig instance
@@ -317,7 +361,9 @@ public final class BOSHClientConfig {
                     bProxyHost,
                     port,
                     bSSLContext,
-                    compression);
+                    compression,
+                    ack,
+                    httpHeaders);
         }
 
     }
@@ -347,7 +393,9 @@ public final class BOSHClientConfig {
             final String cProxyHost,
             final int cProxyPort,
             final SSLContext cSSLContext,
-            final boolean cCompression) {
+            final boolean cCompression,
+            final boolean useAck,
+            final Map<String, String> cHttpHeaders) {
         uri = cURI;
         to = cDomain;
         from = cFrom;
@@ -357,6 +405,8 @@ public final class BOSHClientConfig {
         proxyPort = cProxyPort;
         sslContext = cSSLContext;
         compressionEnabled = cCompression;
+        ack = useAck;
+        httpHeaders = cHttpHeaders;
     }
 
     /**
@@ -443,6 +493,12 @@ public final class BOSHClientConfig {
      */
     boolean isCompressionEnabled() {
         return compressionEnabled;
+    }
+
+    public boolean isAckEnabled() { return ack; }
+
+    public Map<String, String> getHttpHeaders() {
+        return httpHeaders;
     }
 
 }
