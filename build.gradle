@@ -146,7 +146,7 @@ task compileAndroid(type: JavaCompile) {
 	source = compileJava.source
 	classpath = compileJava.classpath
 	destinationDir = new File(buildDir, 'android')
-	options.bootClasspath = androidBootClasspath
+	options.bootstrapClasspath = files(androidBootClasspath)
 }
 
 test { dependsOn compileAndroid }
