@@ -17,16 +17,17 @@
 package org.igniterealtime.jbosh;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ByteArrayEntity;
 
+import org.apache.http.message.BasicHeader;
 import org.apache.http.protocol.BasicHttpContext;
 import org.apache.http.protocol.HttpContext;
 import org.apache.http.util.EntityUtils;
@@ -153,8 +154,8 @@ final class ApacheHTTPResponse implements HTTPResponse {
             if (cfg.isCompressionEnabled()) {
                 post.setHeader(ACCEPT_ENCODING, ACCEPT_ENCODING_VAL);
             }
-            for(Header header: cfg.getHttpHeaders()) {
-                post.addHeader(header);
+            for(Map.Entry<String, String> header: cfg.getHttpHeaders().entrySet()) {
+                post.addHeader(new BasicHeader(header.getKey(), header.getValue()));
             }
         } catch (Exception e) {
             toThrow = new BOSHException("Could not generate request", e);
