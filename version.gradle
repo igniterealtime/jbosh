@@ -1,5 +1,5 @@
 ext {
 		shortVersion = '0.9.1'
-		isSnapshot = true
+		isSnapshot = false
 		smackMinAndroidSdk = 9
 }
