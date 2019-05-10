@@ -16,11 +16,9 @@
 
 package org.igniterealtime.jbosh;
 
-import org.apache.http.Header;
-
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import javax.net.ssl.SSLContext;
 
 /**
@@ -91,7 +89,7 @@ public final class BOSHClientConfig {
     /**
      * Any additional headers to be sent in the HTTP requests
      */
-    private List<Header> httpHeaders;
+    private Map<String, String> httpHeaders;
 
     /**
      * Version of the BOSH protocol.
@@ -124,8 +122,8 @@ public final class BOSHClientConfig {
         private SSLContext bSSLContext;
         private Boolean bCompression;
         private boolean ack = true;
-        private List<Header> httpHeaders = new ArrayList<>();
         private AttrVersion boshVersion = AttrVersion.getSupportedVersion();
+        private Map<String, String> httpHeaders = new HashMap<>();
 
         /**
          * Creates a new builder instance, used to create instances of the
@@ -320,12 +318,13 @@ public final class BOSHClientConfig {
         /**
          * Any additional headers to be sent in the HTTP requests
          *
-         * @param additionalHeader to be sent with every request
+         * @param name of header to be sent with every request
+         * @param value of header to be sent with every request
          *
          * @return builder instance
          */
-        public Builder addHttpHeader(Header additionalHeader) {
-            this.httpHeaders.add(additionalHeader);
+        public Builder addHttpHeader(String name, String value) {
+            this.httpHeaders.put(name, value);
             return this;
         }
 
@@ -420,7 +419,7 @@ public final class BOSHClientConfig {
             final SSLContext cSSLContext,
             final boolean cCompression,
             final boolean useAck,
-            final List<Header> cHttpHeaders,
+            final Map<String, String> cHttpHeaders,
             AttrVersion cBoshVersion) {
         uri = cURI;
         to = cDomain;
@@ -524,7 +523,7 @@ public final class BOSHClientConfig {
 
     public boolean isAckEnabled() { return ack; }
 
-    public List<Header> getHttpHeaders() {
+    public Map<String, String> getHttpHeaders() {
         return httpHeaders;
     }
 
