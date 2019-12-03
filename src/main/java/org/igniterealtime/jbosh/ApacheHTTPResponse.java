@@ -22,6 +22,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
@@ -82,6 +83,11 @@ final class ApacheHTTPResponse implements HTTPResponse {
     private final HttpPost post;
 
     /**
+     * The target host for the request.
+     */
+    private final HttpHost host;
+
+    /**
      * A flag which indicates if the transmission was already done.
      */
     private boolean sent;
@@ -126,6 +132,15 @@ final class ApacheHTTPResponse implements HTTPResponse {
         this.context = new BasicHttpContext();
         this.post = new HttpPost(cfg.getURI().toString());
         this.sent = false;
+
+        if (cfg.getHostAddress() != null) {
+            this.host = new HttpHost(
+                cfg.getHostAddress().getHostAddress(),
+                cfg.getURI().getPort(),
+                cfg.getURI().getScheme());
+        } else {
+            this.host = null;
+        }
 
         try {
             String xml = request.toXML();
@@ -232,7 +247,9 @@ final class ApacheHTTPResponse implements HTTPResponse {
     private synchronized void awaitResponse() throws BOSHException {
         HttpEntity entity = null;
         try {
-            HttpResponse httpResp = client.execute(post, context);
+            HttpResponse httpResp = host == null ?
+                client.execute(post, context) :
+                client.execute(host, post, context);
             entity = httpResp.getEntity();
             byte[] data = EntityUtils.toByteArray(entity);
             String encoding = entity.getContentEncoding() != null ?

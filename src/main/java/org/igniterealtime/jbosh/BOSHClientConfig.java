@@ -16,6 +16,7 @@
 
 package org.igniterealtime.jbosh;
 
+import java.net.InetAddress;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
@@ -36,6 +37,12 @@ public final class BOSHClientConfig {
      * Connection manager URI.
      */
     private final URI uri;
+
+    /**
+     * The Internet address that will be used to establish the connection,
+     * if not specified dns resolution will be made for the uri.
+     */
+    private final InetAddress hostAddress;
 
     /**
      * Target domain.
@@ -109,6 +116,7 @@ public final class BOSHClientConfig {
         private final String bDomain;
 
         // Optional args
+        private InetAddress bHostAddress = null;
         private String bFrom;
         private String bLang;
         private String bRoute;
@@ -165,6 +173,7 @@ public final class BOSHClientConfig {
          */
         public static Builder create(final BOSHClientConfig cfg) {
             Builder result = new Builder(cfg.getURI(), cfg.getTo());
+            result.bHostAddress = cfg.getHostAddress();
             result.bFrom = cfg.getFrom();
             result.bLang = cfg.getLang();
             result.bRoute = cfg.getRoute();
@@ -190,7 +199,7 @@ public final class BOSHClientConfig {
             bFrom = id;
             return this;
         }
-        
+
         /**
          * Set the default language of any human-readable content within the
          * XML.
@@ -323,6 +332,18 @@ public final class BOSHClientConfig {
         }
 
         /**
+         * Sets the address to use when establishing the connection.
+         *
+         * @param hostAddress the address to use when establishing the connection.
+         *
+         * @return builder instance
+         */
+        public Builder setHostAddress(InetAddress hostAddress) {
+            this.bHostAddress = hostAddress;
+            return this;
+        }
+
+        /**
          * Build the immutable object instance with the current configuration.
          *
          * @return BOSHClientConfig instance
@@ -354,6 +375,7 @@ public final class BOSHClientConfig {
 
             return new BOSHClientConfig(
                     bURI,
+                    bHostAddress,
                     bDomain,
                     bFrom,
                     lang,
@@ -375,6 +397,7 @@ public final class BOSHClientConfig {
      * Prevent direct construction.
      *
      * @param cURI URI of the connection manager to connect to
+     * @param cHostAddress the Internet address that will be used to establish the connection
      * @param cDomain the target domain of the first stream
      * @param cFrom client ID
      * @param cLang default XML language
@@ -386,6 +409,7 @@ public final class BOSHClientConfig {
      */
     private BOSHClientConfig(
             final URI cURI,
+            final InetAddress cHostAddress,
             final String cDomain,
             final String cFrom,
             final String cLang,
@@ -397,6 +421,7 @@ public final class BOSHClientConfig {
             final boolean useAck,
             final Map<String, String> cHttpHeaders) {
         uri = cURI;
+        hostAddress = cHostAddress;
         to = cDomain;
         from = cFrom;
         lang = cLang;
@@ -416,6 +441,15 @@ public final class BOSHClientConfig {
      */
     public URI getURI() {
         return uri;
+    }
+
+    /**
+     * Get the address to use when establishing the connection.
+     *
+     * @return the address to use when establishing the connection.
+     */
+    public InetAddress getHostAddress() {
+        return hostAddress;
     }
 
     /**
