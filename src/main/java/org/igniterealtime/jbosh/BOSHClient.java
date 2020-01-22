@@ -695,6 +695,14 @@ public final class BOSHClient {
                 processor.dispose();
             }
             procThreads = null;
+
+            clearEmptyRequest();
+            exchanges = null;
+            cmParams = null;
+            pendingResponseAcks = null;
+            pendingRequestAcks = null;
+            notEmpty.signalAll();
+            notFull.signalAll();
         } finally {
             lock.unlock();
         }
@@ -707,18 +715,11 @@ public final class BOSHClient {
 
         lock.lock();
         try {
-            clearEmptyRequest();
-            exchanges = null;
-            cmParams = null;
-            pendingResponseAcks = null;
-            pendingRequestAcks = null;
-            notEmpty.signalAll();
-            notFull.signalAll();
             drained.signalAll();
         } finally {
             lock.unlock();
         }
-        
+
         httpSender.destroy();
         schedExec.shutdownNow();
     }

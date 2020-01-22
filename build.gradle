@@ -1,5 +1,5 @@
 apply plugin: 'java'
-apply plugin: 'maven'
+apply plugin: 'maven-publish'
 apply plugin: 'eclipse'
 apply plugin: 'osgi'
 apply plugin: 'signing'
@@ -11,7 +11,8 @@ ext {
 	gitCommit = getGitCommit()
 	sonatypeCredentialsAvailable = project.hasProperty('sonatypeUsername') && project.hasProperty('sonatypePassword')
 	isReleaseVersion = !isSnapshot
-	signingRequired = isReleaseVersion
+	isContinuousIntegrationEnvironment = Boolean.parseBoolean(System.getenv('CI'))
+	signingRequired = !(isSnapshot || isContinuousIntegrationEnvironment)
 	sonatypeSnapshotUrl = 'https://oss.sonatype.org/content/repositories/snapshots'
 	sonatypeStagingUrl = 'https://oss.sonatype.org/service/local/staging/deploy/maven2'
 	buildDate = (new java.text.SimpleDateFormat("yyyy-MM-dd")).format(new Date())
@@ -30,79 +31,88 @@ JBOSH ${version}
 XEP-0124: Bidirectional-streams Over Synchronous HTTP (BOSH)
 """
 
-import org.gradle.plugins.signing.Sign
-gradle.taskGraph.whenReady { taskGraph ->
-	if (signingRequired && taskGraph.allTasks.any { it instanceof Sign }) {
-		// Use Java 6's console to read from the console (no good for a CI environment)
-		def console = System.console()
-		if (console == null) {
-			throw new Exception("Could not obtain system console (Console is 'null'). Did you build with gradle daemon? Try the same Gradle command with \"--no-daemon\".")
-		}
-
-		console.printf '\n\nWe have to sign some things in this build.\n\nPlease enter your signing details.\n\n'
-		def password = console.readPassword('GnuPG Private Key Password: ')
-
-		allprojects { ext.'signing.password' = password }
-
-		console.printf '\nThanks.\n\n'
-	}
+task sourcesJar(type: Jar, dependsOn: classes) {
+	classifier = 'sources'
+	from sourceSets.main.allSource
 }
 
-uploadArchives {
-	repositories {
-		mavenDeployer {
-			if (signingRequired) {
-				beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
-			}
-			repository(url: project.sonatypeStagingUrl) {
-				if (sonatypeCredentialsAvailable) {
-					authentication(userName: sonatypeUsername, password: sonatypePassword)
-				}
-			}
-			snapshotRepository(url: project.sonatypeSnapshotUrl) {
-				if (sonatypeCredentialsAvailable) {
-					authentication(userName: sonatypeUsername, password: sonatypePassword)
-				}
-			}
-			pom.project {
-				name 'JBOSH'
-				description 'XEP-0124: Bidirectional-streams Over Synchronous HTTP (BOSH)'
-				packaging 'jar'
-				url 'http://www.igniterealtime.org/projects/jbosh/'
+task javadocJar(type: Jar, dependsOn: javadoc) {
+	classifier = 'javadoc'
+	from javadoc.destinationDir
+}
+
+task testSourcesJar(type: Jar, dependsOn: classes) {
+	classifier = 'test-sources'
+	from sourceSets.test.allSource
+}
+
+artifacts {
+	archives sourcesJar
+	archives javadocJar
+	archives testSourcesJar
+}
+
+publishing {
+	publications {
+		mavenJava(MavenPublication) {
+			from components.java
+			artifact sourcesJar
+			artifact javadocJar
+			artifact testSourcesJar
+			pom {
+				name = 'JBOSH'
+				description = 'XEP-0124: Bidirectional-streams Over Synchronous HTTP (BOSH)'
+				packaging = 'jar'
+				url = 'http://www.igniterealtime.org/projects/jbosh/'
 
 				scm {
-					url 'https://github.com/igniterealtime/jbosh'
-					connection 'scm:git:https://github.com/igniterealtime/jbosh.git'
-					developerConnection 'scm:git:https://github.com/igniterealtime/jbosh.git'
+					url = 'https://github.com/igniterealtime/jbosh'
+					connection = 'scm:git:https://github.com/igniterealtime/jbosh.git'
+					developerConnection = 'scm:git:https://github.com/igniterealtime/jbosh.git'
 				}
 
 				licenses {
 					license {
-						name 'The Apache Software License, Version 2.0'
-						url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-						distribution 'repo'
+						name = 'The Apache Software License, Version 2.0'
+						url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+						distribution = 'repo'
 					}
 				}
 
 				developers {
 					developer {
-						id 'flow'
-						name 'Florian Schmaus'
-						email 'flow@igniterealtime.org'
+						id = 'flow'
+						name = 'Florian Schmaus'
+						email = 'flow@igniterealtime.org'
 					}
+				}
+			}
+		}
+	}
+	repositories {
+		maven {
+			url isSnapshot ? sonatypeSnapshotUrl : sonatypeStagingUrl
+			if (sonatypeCredentialsAvailable) {
+				credentials {
+					username = sonatypeUsername
+					password = sonatypePassword
 				}
 			}
 		}
 	}
 }
 
-signing {
-	required { signingRequired }
-	sign configurations.archives
-}
-
 repositories {
 	mavenCentral()
+	maven {
+		url sonatypeSnapshotUrl
+	}
+}
+
+signing {
+	useGpgCmd()
+	required { signingRequired }
+	sign publishing.publications.mavenJava
 }
 
 dependencies {
@@ -131,21 +141,6 @@ tasks.withType(JavaCompile) {
 		]
 }
 
-task sourcesJar(type: Jar, dependsOn: classes) {
-	classifier = 'sources'
-	from sourceSets.main.allSource
-}
-
-task javadocJar(type: Jar, dependsOn: javadoc) {
-	classifier = 'javadoc'
-	from javadoc.destinationDir
-}
-
-task testSourcesJar(type: Jar, dependsOn: classes) {
-	classifier = 'test-sources'
-	from sourceSets.test.allSource
-}
-
 task compileAndroid(type: JavaCompile) {
 	source = compileJava.source
 	classpath = compileJava.classpath
@@ -154,12 +149,6 @@ task compileAndroid(type: JavaCompile) {
 }
 
 test { dependsOn compileAndroid }
-
-artifacts {
-	archives sourcesJar
-	archives javadocJar
-	archives testSourcesJar
-}
 
 def getGitCommit() {
 	def dotGit = new File("$projectDir/.git")
