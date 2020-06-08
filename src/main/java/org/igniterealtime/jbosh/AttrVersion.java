@@ -20,7 +20,7 @@ package org.igniterealtime.jbosh;
  * Data type representing the getValue of the {@code ver} attribute of the
  * {@code bosh} element.
  */
-final class AttrVersion extends AbstractAttr<String> {
+public final class AttrVersion extends AbstractAttr<String> {
 
     /**
      * Default value if none is provided.
@@ -106,7 +106,7 @@ final class AttrVersion extends AbstractAttr<String> {
      *  {@code null}
      * @throws BOSHException on parse or validation failure
      */
-    static AttrVersion createFromString(final String str)
+    public static AttrVersion createFromString(final String str)
     throws BOSHException {
         if (str == null) {
             return null;

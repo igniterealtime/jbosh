@@ -91,6 +91,11 @@ public final class BOSHClientConfig {
      */
     private Map<String, String> httpHeaders;
 
+    /**
+     * Version of the BOSH protocol.
+     */
+    private AttrVersion boshVersion;
+
     ///////////////////////////////////////////////////////////////////////////
     // Classes:
 
@@ -117,6 +122,7 @@ public final class BOSHClientConfig {
         private SSLContext bSSLContext;
         private Boolean bCompression;
         private boolean ack = true;
+        private AttrVersion boshVersion = AttrVersion.getSupportedVersion();
         private Map<String, String> httpHeaders = new HashMap<>();
 
         /**
@@ -323,6 +329,23 @@ public final class BOSHClientConfig {
         }
 
         /**
+         * Version of the BOSH communication to be sent over to the server.
+         *
+         * The version, by default, is the latest version that this library supports.
+         * But in some cases, the server expects a different version, and would
+         * reject the connection otherwise. So change it on your own risk.
+         * See <a href="https://xmpp.org/extensions/xep-0124.html#appendix-revs">list of versions</a>
+         *
+         * @param version of the protocol to be sent over to the server
+         * @return builder instance
+         */
+        public Builder setBoshVersion(AttrVersion version) {
+            this.boshVersion = version;
+            return this;
+        }
+
+
+        /**
          * Build the immutable object instance with the current configuration.
          *
          * @return BOSHClientConfig instance
@@ -363,7 +386,8 @@ public final class BOSHClientConfig {
                     bSSLContext,
                     compression,
                     ack,
-                    httpHeaders);
+                    httpHeaders,
+                    boshVersion);
         }
 
     }
@@ -373,8 +397,7 @@ public final class BOSHClientConfig {
 
     /**
      * Prevent direct construction.
-     *
-     * @param cURI URI of the connection manager to connect to
+     *  @param cURI URI of the connection manager to connect to
      * @param cDomain the target domain of the first stream
      * @param cFrom client ID
      * @param cLang default XML language
@@ -383,6 +406,7 @@ public final class BOSHClientConfig {
      * @param cProxyPort proxy port
      * @param cSSLContext SSL context
      * @param cCompression compression enabled flag
+     * @param cBoshVersion version of the protocol to be sent over
      */
     private BOSHClientConfig(
             final URI cURI,
@@ -395,7 +419,8 @@ public final class BOSHClientConfig {
             final SSLContext cSSLContext,
             final boolean cCompression,
             final boolean useAck,
-            final Map<String, String> cHttpHeaders) {
+            final Map<String, String> cHttpHeaders,
+            AttrVersion cBoshVersion) {
         uri = cURI;
         to = cDomain;
         from = cFrom;
@@ -407,6 +432,7 @@ public final class BOSHClientConfig {
         compressionEnabled = cCompression;
         ack = useAck;
         httpHeaders = cHttpHeaders;
+        boshVersion = cBoshVersion;
     }
 
     /**
@@ -501,4 +527,7 @@ public final class BOSHClientConfig {
         return httpHeaders;
     }
 
+    public AttrVersion getBoshVersion() {
+        return boshVersion;
+    }
 }
