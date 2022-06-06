@@ -665,7 +665,7 @@ public class RequestValidator
                     throw new UnsupportedOperationException("Not supported.");
                 }
 
-                public Iterator<?> getPrefixes(String namespaceURI) {
+                public Iterator<String> getPrefixes(String namespaceURI) {
                     throw new UnsupportedOperationException("Not supported.");
                 }
 
