@@ -29,7 +29,6 @@ ext {
 }
 
 group = 'org.igniterealtime.jbosh'
-sourceCompatibility = 1.7
 version = shortVersion
 if (isSnapshot) {
 	version += '-SNAPSHOT'
@@ -125,13 +124,14 @@ signing {
 }
 
 dependencies {
-	compile 'xpp3:xpp3:1.1.4c'
-	compile 'org.apache.httpcomponents:httpclient:4.3.3'
-	testCompile 'org.xlightweb:xlightweb:2.5'
-	testCompile 'junit:junit:4.12'
+	implementation 'xpp3:xpp3:1.1.4c'
+	implementation 'org.apache.httpcomponents:httpclient:4.3.3'
+	testImplementation 'org.xlightweb:xlightweb:2.5'
+	testImplementation 'junit:junit:4.12'
 }
 
 tasks.withType(JavaCompile) {
+	options.release = 7
 		// Some systems may not have set their platform default
 		// converter to 'utf8', but we use unicode in our source
 		// files. Therefore ensure that javac uses unicode
