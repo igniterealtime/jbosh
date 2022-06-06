@@ -1,7 +1,16 @@
+buildscript {
+	repositories {
+		maven { url 'https://plugins.gradle.org/m2/' }
+	}
+	dependencies {
+		classpath "biz.aQute.bnd:biz.aQute.bnd.gradle:6.3.0"
+	}
+}
+
 apply plugin: 'java'
 apply plugin: 'maven-publish'
 apply plugin: 'eclipse'
-apply plugin: 'osgi'
+apply plugin: 'biz.aQute.bnd.builder'
 apply plugin: 'signing'
 apply plugin: 'checkstyle'
 
